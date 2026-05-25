@@ -30,22 +30,8 @@ runs:
     - name: Compute cache key
       id: cache-key
       shell: bash
-      env:
-        GH_TOKEN: ${{ github.token }}
       run: |
-        PARTS="${{ github.action_path }}"
-        PARTS="${PARTS#*/_actions/}"
-        OWNER=$(echo "$PARTS" | cut -d/ -f1)
-        REPO=$(echo "$PARTS" | cut -d/ -f2)
-        REF=$(echo "$PARTS" | cut -d/ -f3-)
-        ACTION_REPO="${OWNER}/${REPO}"
-
-        RUN_STARTED=$(curl -sfL -H "Authorization: Bearer $GH_TOKEN" \
-          "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-          | jq -r '.run_started_at')
-        HASH=$(curl -sfL -H "Authorization: Bearer $GH_TOKEN" \
-          "https://api.github.com/repos/${ACTION_REPO}/commits?sha=${REF}&until=${RUN_STARTED}&per_page=1" \
-          | jq -r '.[0].sha')
+        HASH=$(find "${{ github.action_path }}" -type f \( -name '*.go' -o -name 'go.sum' -o -name 'go.mod' \) | sort | xargs sha256sum | sha256sum | cut -d' ' -f1)
         echo "hash=${HASH}" >> "$GITHUB_OUTPUT"
 
     - name: Cache json-validator binary
