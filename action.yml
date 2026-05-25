@@ -31,7 +31,7 @@ runs:
       id: cache-key
       shell: bash
       run: |
-        HASH=$(find "${{ github.action_path }}" \( -name '*.go' -o -name 'go.sum' -o -name 'go.mod' \) -print0 | sort -z | xargs -0 cat | sha256sum | cut -d' ' -f1)
+        HASH=$(git -C "${{ github.action_path }}" rev-parse HEAD)
         echo "hash=${HASH}" >> "$GITHUB_OUTPUT"
 
     - name: Cache json-validator binary
