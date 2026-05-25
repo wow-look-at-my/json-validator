@@ -1,0 +1,7 @@
+{
+  // This is a line comment
+  "name": "Bob",
+  "email": "bob@example.com",
+  /* Block comment */
+  "age": 25,
+}
