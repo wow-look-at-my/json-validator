@@ -31,12 +31,7 @@ runs:
       id: cache-key
       shell: bash
       run: |
-        REF="${{ github.action_ref }}"
-        if [[ "$REF" =~ ^[0-9a-f]{40}$ ]]; then
-          HASH="$REF"
-        else
-          HASH=$(git ls-remote "https://github.com/${{ github.action_repository }}.git" "$REF" | head -1 | cut -f1)
-        fi
+        HASH=$(find "${{ github.action_path }}" -type f \( -name '*.go' -o -name 'go.sum' -o -name 'go.mod' \) | sort | xargs sha256sum | sha256sum | cut -d' ' -f1)
         echo "hash=${HASH}" >> "$GITHUB_OUTPUT"
 
     - name: Cache json-validator binary
