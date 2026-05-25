@@ -84,7 +84,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	if !quietFlag {
-		if err := printResults(results); err != nil {
+		if err := printResults(cmd, results); err != nil {
 			return err
 		}
 	}
@@ -109,25 +109,27 @@ func compileSharedSchema(opts validator.Options) (*jsonschema.Schema, error) {
 	return sch, nil
 }
 
-func printResults(results []validator.Result) error {
+func printResults(cmd *cobra.Command, results []validator.Result) error {
 	if jsonOutputFlag {
-		return printJSON(results)
+		return printJSON(cmd, results)
 	}
-	return printHuman(results)
+	return printHuman(cmd, results)
 }
 
-func printHuman(results []validator.Result) error {
+func printHuman(cmd *cobra.Command, results []validator.Result) error {
+	out := cmd.OutOrStdout()
+	errOut := cmd.ErrOrStderr()
 	for _, r := range results {
 		if r.Err != nil {
-			fmt.Fprintf(os.Stderr, "%s: error: %v\n", r.File, r.Err)
+			fmt.Fprintf(errOut, "%s: error: %v\n", r.File, r.Err)
 			continue
 		}
 		if r.Error != nil {
-			fmt.Fprintf(os.Stderr, "%s: INVALID\n", r.File)
-			fmt.Fprintln(os.Stderr, r.Error)
+			fmt.Fprintf(errOut, "%s: INVALID\n", r.File)
+			fmt.Fprintln(errOut, r.Error)
 			continue
 		}
-		fmt.Printf("%s: valid\n", r.File)
+		fmt.Fprintf(out, "%s: valid\n", r.File)
 	}
 	return nil
 }
@@ -139,7 +141,7 @@ type jsonFileResult struct {
 	Errors any    `json:"errors,omitempty"`
 }
 
-func printJSON(results []validator.Result) error {
+func printJSON(cmd *cobra.Command, results []validator.Result) error {
 	out := make([]jsonFileResult, len(results))
 	for i, r := range results {
 		out[i] = jsonFileResult{
@@ -153,7 +155,7 @@ func printJSON(results []validator.Result) error {
 			out[i].Errors = r.Error.BasicOutput()
 		}
 	}
-	enc := json.NewEncoder(os.Stdout)
+	enc := json.NewEncoder(cmd.OutOrStdout())
 	enc.SetIndent("", "  ")
 	return enc.Encode(out)
 }

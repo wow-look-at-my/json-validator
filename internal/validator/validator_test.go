@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"github.com/wow-look-at-my/testify/assert"
+	"github.com/wow-look-at-my/testify/require"
 )
 
 func testdataPath(name string) string {
@@ -13,8 +15,8 @@ func testdataPath(name string) string {
 
 func TestParseDraft(t *testing.T) {
 	tests := []struct {
-		input   string
-		wantErr bool
+		input	string
+		wantErr	bool
 	}{
 		{"4", false},
 		{"6", false},
@@ -28,19 +30,18 @@ func TestParseDraft(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			_, err := parseDraft(tt.input)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("parseDraft(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
-			}
+			assert.Equal(t, tt.wantErr, (err != nil))
+
 		})
 	}
 }
 
 func TestSilentFailureAllowed(t *testing.T) {
 	tests := []struct {
-		name    string
-		env     string
-		feature string
-		want    bool
+		name	string
+		env	string
+		feature	string
+		want	bool
 	}{
 		{"empty env", "", "assert-format", false},
 		{"comma separated match", "assert-format,other", "assert-format", true},
@@ -54,17 +55,16 @@ func TestSilentFailureAllowed(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv("JSON_VALIDATION_ALLOW_SILENT_FAILURES", tt.env)
 			got := silentFailureAllowed(tt.feature)
-			if got != tt.want {
-				t.Errorf("silentFailureAllowed(%q) with env=%q: got %v, want %v", tt.feature, tt.env, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got)
+
 		})
 	}
 }
 
 func TestSplitMulti(t *testing.T) {
 	tests := []struct {
-		input string
-		want  int
+		input	string
+		want	int
 	}{
 		{"", 0},
 		{"a", 1},
@@ -76,51 +76,47 @@ func TestSplitMulti(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			got := splitMulti(tt.input)
-			if len(got) != tt.want {
-				t.Errorf("splitMulti(%q) = %v (len %d), want len %d", tt.input, got, len(got), tt.want)
-			}
+			assert.Equal(t, tt.want, len(got))
+
 		})
 	}
 }
 
 func TestExtractSchemaURI(t *testing.T) {
 	tests := []struct {
-		name    string
-		doc     any
-		want    string
-		wantErr bool
+		name	string
+		doc	any
+		want	string
+		wantErr	bool
 	}{
 		{
-			name: "valid $schema",
-			doc:  map[string]any{"$schema": "https://json-schema.org/draft/2020-12/schema"},
-			want: "https://json-schema.org/draft/2020-12/schema",
+			name:	"valid $schema",
+			doc:	map[string]any{"$schema": "https://json-schema.org/draft/2020-12/schema"},
+			want:	"https://json-schema.org/draft/2020-12/schema",
 		},
 		{
-			name:    "missing $schema",
-			doc:     map[string]any{"name": "test"},
-			wantErr: true,
+			name:		"missing $schema",
+			doc:		map[string]any{"name": "test"},
+			wantErr:	true,
 		},
 		{
-			name:    "non-object document",
-			doc:     []any{1, 2, 3},
-			wantErr: true,
+			name:		"non-object document",
+			doc:		[]any{1, 2, 3},
+			wantErr:	true,
 		},
 		{
-			name:    "$schema is not a string",
-			doc:     map[string]any{"$schema": 42},
-			wantErr: true,
+			name:		"$schema is not a string",
+			doc:		map[string]any{"$schema": 42},
+			wantErr:	true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := extractSchemaURI(tt.doc)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("extractSchemaURI() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("extractSchemaURI() = %q, want %q", got, tt.want)
-			}
+			assert.Equal(t, tt.wantErr, (err != nil))
+
+			assert.Equal(t, tt.want, got)
+
 		})
 	}
 }
@@ -128,40 +124,33 @@ func TestExtractSchemaURI(t *testing.T) {
 func TestNewCompiler(t *testing.T) {
 	t.Run("default options", func(t *testing.T) {
 		c, err := NewCompiler(Options{Draft: "2020"})
-		if err != nil {
-			t.Fatalf("NewCompiler() error = %v", err)
-		}
-		if c == nil {
-			t.Fatal("NewCompiler() returned nil")
-		}
+		require.Nil(t, err)
+
+		require.NotNil(t, c)
+
 	})
 
 	t.Run("invalid draft", func(t *testing.T) {
 		_, err := NewCompiler(Options{Draft: "invalid"})
-		if err == nil {
-			t.Fatal("NewCompiler() expected error for invalid draft")
-		}
+		require.NotNil(t, err)
+
 	})
 
 	t.Run("no assert format", func(t *testing.T) {
 		c, err := NewCompiler(Options{Draft: "2020", NoAssertFormat: true})
-		if err != nil {
-			t.Fatalf("NewCompiler() error = %v", err)
-		}
-		if c == nil {
-			t.Fatal("NewCompiler() returned nil")
-		}
+		require.Nil(t, err)
+
+		require.NotNil(t, c)
+
 	})
 
 	t.Run("no assert format via env", func(t *testing.T) {
 		t.Setenv("JSON_VALIDATION_ALLOW_SILENT_FAILURES", "assert-format")
 		c, err := NewCompiler(Options{Draft: "2020"})
-		if err != nil {
-			t.Fatalf("NewCompiler() error = %v", err)
-		}
-		if c == nil {
-			t.Fatal("NewCompiler() returned nil")
-		}
+		require.Nil(t, err)
+
+		require.NotNil(t, c)
+
 	})
 }
 
@@ -171,68 +160,54 @@ func TestValidateFile(t *testing.T) {
 	t.Run("valid document", func(t *testing.T) {
 		opts := Options{SchemaPath: schemaPath, Draft: "2020"}
 		c, err := NewCompiler(opts)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.Nil(t, err)
+
 		sch, err := CompileSchema(c, schemaPath)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.Nil(t, err)
+
 		r := ValidateFile(testdataPath("valid.json"), sch, opts)
-		if r.Err != nil {
-			t.Fatalf("unexpected error: %v", r.Err)
-		}
-		if !r.Valid {
-			t.Errorf("expected valid, got invalid: %v", r.Error)
-		}
+		require.Nil(t, r.Err)
+
+		assert.True(t, r.Valid)
+
 	})
 
 	t.Run("invalid document", func(t *testing.T) {
 		opts := Options{SchemaPath: schemaPath, Draft: "2020"}
 		c, err := NewCompiler(opts)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.Nil(t, err)
+
 		sch, err := CompileSchema(c, schemaPath)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.Nil(t, err)
+
 		r := ValidateFile(testdataPath("invalid.json"), sch, opts)
-		if r.Err != nil {
-			t.Fatalf("unexpected error: %v", r.Err)
-		}
-		if r.Valid {
-			t.Error("expected invalid, got valid")
-		}
-		if r.Error == nil {
-			t.Error("expected validation error, got nil")
-		}
+		require.Nil(t, r.Err)
+
+		assert.False(t, r.Valid)
+
+		assert.NotNil(t, r.Error)
+
 	})
 
 	t.Run("file not found", func(t *testing.T) {
 		r := ValidateFile("nonexistent.json", nil, Options{Draft: "2020"})
-		if r.Err == nil {
-			t.Error("expected error for missing file")
-		}
+		assert.NotNil(t, r.Err)
+
 	})
 
 	t.Run("JSONC input", func(t *testing.T) {
 		opts := Options{SchemaPath: schemaPath, Draft: "2020"}
 		c, err := NewCompiler(opts)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.Nil(t, err)
+
 		sch, err := CompileSchema(c, schemaPath)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.Nil(t, err)
+
 		r := ValidateFile(testdataPath("valid.jsonc"), sch, opts)
-		if r.Err != nil {
-			t.Fatalf("unexpected error: %v", r.Err)
-		}
-		if !r.Valid {
-			t.Errorf("expected valid JSONC, got invalid: %v", r.Error)
-		}
+		require.Nil(t, r.Err)
+
+		assert.True(t, r.Valid)
+
 	})
 }
 
@@ -242,71 +217,59 @@ func TestValidateReader(t *testing.T) {
 	t.Run("valid from reader", func(t *testing.T) {
 		opts := Options{SchemaPath: schemaPath, Draft: "2020"}
 		c, err := NewCompiler(opts)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.Nil(t, err)
+
 		sch, err := CompileSchema(c, schemaPath)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.Nil(t, err)
+
 		input := strings.NewReader(`{"name": "Test", "email": "test@example.com"}`)
 		r := Validate(input, "<test>", sch, opts)
-		if r.Err != nil {
-			t.Fatalf("unexpected error: %v", r.Err)
-		}
-		if !r.Valid {
-			t.Errorf("expected valid, got invalid: %v", r.Error)
-		}
+		require.Nil(t, r.Err)
+
+		assert.True(t, r.Valid)
+
 	})
 
 	t.Run("invalid JSON", func(t *testing.T) {
 		r := Validate(strings.NewReader("{invalid json}"), "<test>", nil, Options{Draft: "2020"})
-		if r.Err == nil {
-			t.Error("expected parse error for invalid JSON")
-		}
+		assert.NotNil(t, r.Err)
+
 	})
 
 	t.Run("JSONC from reader", func(t *testing.T) {
 		opts := Options{SchemaPath: schemaPath, Draft: "2020"}
 		c, err := NewCompiler(opts)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.Nil(t, err)
+
 		sch, err := CompileSchema(c, schemaPath)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.Nil(t, err)
+
 		input := strings.NewReader(`{
 			// comment
 			"name": "Test",
 			"email": "test@example.com",
 		}`)
 		r := Validate(input, "<test>", sch, opts)
-		if r.Err != nil {
-			t.Fatalf("unexpected error: %v", r.Err)
-		}
-		if !r.Valid {
-			t.Errorf("expected valid JSONC, got invalid: %v", r.Error)
-		}
+		require.Nil(t, r.Err)
+
+		assert.True(t, r.Valid)
+
 	})
 }
 
 func TestValidateWithSchemaFromDocument(t *testing.T) {
 	t.Run("document with $schema", func(t *testing.T) {
 		r := ValidateFile(testdataPath("valid_with_schema.json"), nil, Options{Draft: "2020"})
-		if r.Err != nil {
-			t.Fatalf("unexpected error: %v", r.Err)
-		}
-		if !r.Valid {
-			t.Errorf("expected valid, got invalid: %v", r.Error)
-		}
+		require.Nil(t, r.Err)
+
+		assert.True(t, r.Valid)
+
 	})
 
 	t.Run("document without $schema and no --schema", func(t *testing.T) {
 		r := ValidateFile(testdataPath("no_schema.json"), nil, Options{Draft: "2020"})
-		if r.Err == nil {
-			t.Error("expected error when no schema available")
-		}
+		assert.NotNil(t, r.Err)
+
 	})
 }
 
@@ -316,59 +279,48 @@ func TestFormatAssertions(t *testing.T) {
 	t.Run("format enforced by default", func(t *testing.T) {
 		opts := Options{SchemaPath: schemaPath, Draft: "2020"}
 		c, err := NewCompiler(opts)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.Nil(t, err)
+
 		sch, err := CompileSchema(c, schemaPath)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.Nil(t, err)
+
 		input := strings.NewReader(`{"name": "Test", "email": "not-an-email"}`)
 		r := Validate(input, "<test>", sch, opts)
-		if r.Valid {
-			t.Error("expected invalid due to format assertion, got valid")
-		}
+		assert.False(t, r.Valid)
+
 	})
 
 	t.Run("format not enforced with NoAssertFormat", func(t *testing.T) {
 		opts := Options{SchemaPath: schemaPath, Draft: "2020", NoAssertFormat: true}
 		c, err := NewCompiler(opts)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.Nil(t, err)
+
 		sch, err := CompileSchema(c, schemaPath)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.Nil(t, err)
+
 		input := strings.NewReader(`{"name": "Test", "email": "not-an-email"}`)
 		r := Validate(input, "<test>", sch, opts)
-		if r.Err != nil {
-			t.Fatalf("unexpected error: %v", r.Err)
-		}
-		if !r.Valid {
-			t.Error("expected valid with format assertions disabled, got invalid")
-		}
+		require.Nil(t, r.Err)
+
+		assert.True(t, r.Valid)
+
 	})
 
 	t.Run("format not enforced via env var", func(t *testing.T) {
 		t.Setenv("JSON_VALIDATION_ALLOW_SILENT_FAILURES", "assert-format")
 		opts := Options{SchemaPath: schemaPath, Draft: "2020"}
 		c, err := NewCompiler(opts)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.Nil(t, err)
+
 		sch, err := CompileSchema(c, schemaPath)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.Nil(t, err)
+
 		input := strings.NewReader(`{"name": "Test", "email": "not-an-email"}`)
 		r := Validate(input, "<test>", sch, opts)
-		if r.Err != nil {
-			t.Fatalf("unexpected error: %v", r.Err)
-		}
-		if !r.Valid {
-			t.Error("expected valid with env-disabled format assertions, got invalid")
-		}
+		require.Nil(t, r.Err)
+
+		assert.True(t, r.Valid)
+
 	})
 }
 
@@ -380,38 +332,31 @@ func TestHTTPLoader(t *testing.T) {
 func TestCompileSchema(t *testing.T) {
 	t.Run("valid schema file", func(t *testing.T) {
 		c, err := NewCompiler(Options{Draft: "2020"})
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.Nil(t, err)
+
 		sch, err := CompileSchema(c, testdataPath("schema.json"))
-		if err != nil {
-			t.Fatalf("CompileSchema() error = %v", err)
-		}
-		if sch == nil {
-			t.Fatal("CompileSchema() returned nil")
-		}
+		require.Nil(t, err)
+
+		require.NotNil(t, sch)
+
 	})
 
 	t.Run("nonexistent schema", func(t *testing.T) {
 		c, err := NewCompiler(Options{Draft: "2020"})
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.Nil(t, err)
+
 		_, err = CompileSchema(c, "nonexistent.json")
-		if err == nil {
-			t.Error("expected error for nonexistent schema")
-		}
+		assert.NotNil(t, err)
+
 	})
 }
 
 func TestValidateFilePermissions(t *testing.T) {
 	tmp := t.TempDir()
 	path := filepath.Join(tmp, "unreadable.json")
-	if err := os.WriteFile(path, []byte(`{"x":1}`), 0o000); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.WriteFile(path, []byte(`{"x":1}`), 0o000))
+
 	r := ValidateFile(path, nil, Options{Draft: "2020"})
-	if r.Err == nil {
-		t.Error("expected error for unreadable file")
-	}
+	assert.NotNil(t, r.Err)
+
 }
