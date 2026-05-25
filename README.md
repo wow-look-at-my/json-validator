@@ -82,6 +82,44 @@ Schemas can be local file paths or HTTP/HTTPS URLs. Well-known meta-schema URIs 
 | 1 | Validation failure or load error |
 | 2 | CLI usage error |
 
+## GitHub Action
+
+Use `wow-look-at-my/json-validator` as a GitHub Action to validate JSON/JSONC files in CI. The action builds the tool with caching (subsequent runs skip the build) and runs it.
+
+### Zero-config (recommended)
+
+With no inputs, the action auto-discovers all `*.json` and `*.jsonc` files containing a `$schema` field and validates them:
+
+```yaml
+- uses: wow-look-at-my/json-validator@v1
+```
+
+### Explicit files
+
+```yaml
+- uses: wow-look-at-my/json-validator@v1
+  with:
+    files: 'config.json settings.jsonc'
+    schema: 'schema.json'
+```
+
+### Advanced: extra CLI flags
+
+```yaml
+- uses: wow-look-at-my/json-validator@v1
+  with:
+    files: 'config.json'
+    args: '--draft 7 --no-assert-format --json'
+```
+
+### Inputs
+
+| Input | Required | Description |
+|-------|----------|-------------|
+| `files` | No | Space-separated files or glob patterns to validate. When omitted, auto-discovers all `*.json`/`*.jsonc` files containing `$schema`. |
+| `schema` | No | Path or URL to JSON Schema (overrides `$schema` in documents) |
+| `args` | No | Additional CLI arguments (e.g. `--draft 7 --no-assert-format --json`). When provided without `files`, skips auto-discovery. |
+
 ## Supported Drafts
 
 - JSON Schema Draft 4
