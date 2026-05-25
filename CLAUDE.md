@@ -18,6 +18,7 @@ The built binary is output to `build/json-validator`.
 - `cmd/root.go` -- cobra root command (CLI flags, arg handling, output formatting)
 - `internal/validator/validator.go` -- schema loading, compilation, validation logic
 - `testdata/` -- test fixture JSON/JSONC files and schemas
+- `action.yml` -- composite GitHub Action (build with caching + run)
 
 ## Key Design Decisions
 
