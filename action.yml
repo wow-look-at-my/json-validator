@@ -1,0 +1,66 @@
+name: 'Validate JSON'
+description: 'Build (with caching) and run json-validator to check JSON/JSONC files against JSON Schema'
+branding:
+  icon: 'check-circle'
+  color: 'green'
+
+inputs:
+  files:
+    description: 'Space-separated list of files to validate (supports glob patterns)'
+    required: false
+    default: ''
+  schema:
+    description: 'Path or URL to JSON Schema (overrides $schema in documents)'
+    required: false
+    default: ''
+  args:
+    description: 'Additional CLI arguments (e.g. "--draft 7 --no-assert-format --json")'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: '${{ github.action_path }}/go.mod'
+        cache: false
+
+    - name: Compute cache key
+      id: cache-key
+      shell: bash
+      run: |
+        HASH=$(find "${{ github.action_path }}" \( -name '*.go' -o -name 'go.sum' -o -name 'go.mod' \) -print0 | sort -z | xargs -0 cat | sha256sum | cut -d' ' -f1)
+        echo "hash=${HASH}" >> "$GITHUB_OUTPUT"
+
+    - name: Cache json-validator binary
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ runner.tool_cache }}/json-validator/bin
+        key: json-validator-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache-key.outputs.hash }}
+
+    - name: Build json-validator
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: |
+        mkdir -p "${{ runner.tool_cache }}/json-validator/bin"
+        go build -o "${{ runner.tool_cache }}/json-validator/bin/json-validator" .
+
+    - name: Run json-validator
+      shell: bash
+      env:
+        INPUT_FILES: ${{ inputs.files }}
+        INPUT_SCHEMA: ${{ inputs.schema }}
+        INPUT_ARGS: ${{ inputs.args }}
+        VALIDATOR_BIN: ${{ runner.tool_cache }}/json-validator/bin/json-validator
+      run: |
+        CMD=("$VALIDATOR_BIN")
+        if [ -n "$INPUT_SCHEMA" ]; then
+          CMD+=(--schema "$INPUT_SCHEMA")
+        fi
+        # shellcheck disable=SC2086
+        CMD+=(${INPUT_ARGS} ${INPUT_FILES})
+        "${CMD[@]}"
