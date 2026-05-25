@@ -6,7 +6,7 @@ branding:
 
 inputs:
   files:
-    description: 'Space-separated list of files to validate (supports glob patterns)'
+    description: 'Space-separated files or glob patterns to validate. When omitted, auto-discovers all *.json and *.jsonc files containing a $schema field.'
     required: false
     default: ''
   schema:
@@ -62,5 +62,23 @@ runs:
           CMD+=(--schema "$INPUT_SCHEMA")
         fi
         # shellcheck disable=SC2086
-        CMD+=(${INPUT_ARGS} ${INPUT_FILES})
+        CMD+=(${INPUT_ARGS})
+
+        if [ -n "$INPUT_FILES" ]; then
+          # shellcheck disable=SC2086
+          CMD+=(${INPUT_FILES})
+        elif [ -z "$INPUT_ARGS" ]; then
+          mapfile -t AUTO_FILES < <(
+            find . -name .git -prune -o -name node_modules -prune -o \
+              \( -name '*.json' -o -name '*.jsonc' \) -print0 |
+            xargs -0 grep -l '"$schema"' 2>/dev/null || true
+          )
+          if [ ${#AUTO_FILES[@]} -eq 0 ]; then
+            echo "No JSON/JSONC files with \$schema found"
+            exit 0
+          fi
+          echo "Auto-discovered ${#AUTO_FILES[@]} file(s) with \$schema"
+          CMD+=("${AUTO_FILES[@]}")
+        fi
+
         "${CMD[@]}"
