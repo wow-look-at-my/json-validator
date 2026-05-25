@@ -33,11 +33,18 @@ runs:
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
+        PARTS="${{ github.action_path }}"
+        PARTS="${PARTS#*/_actions/}"
+        OWNER=$(echo "$PARTS" | cut -d/ -f1)
+        REPO=$(echo "$PARTS" | cut -d/ -f2)
+        REF=$(echo "$PARTS" | cut -d/ -f3-)
+        ACTION_REPO="${OWNER}/${REPO}"
+
         RUN_STARTED=$(curl -sfL -H "Authorization: Bearer $GH_TOKEN" \
           "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
           | jq -r '.run_started_at')
         HASH=$(curl -sfL -H "Authorization: Bearer $GH_TOKEN" \
-          "https://api.github.com/repos/${{ github.action_repository }}/commits?sha=${{ github.action_ref }}&until=${RUN_STARTED}&per_page=1" \
+          "https://api.github.com/repos/${ACTION_REPO}/commits?sha=${REF}&until=${RUN_STARTED}&per_page=1" \
           | jq -r '.[0].sha')
         echo "hash=${HASH}" >> "$GITHUB_OUTPUT"
 
