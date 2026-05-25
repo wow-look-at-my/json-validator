@@ -120,6 +120,7 @@ With no inputs, the action auto-discovers all `*.json` and `*.jsonc` files conta
 | `schema` | No | Path or URL to JSON Schema (overrides `$schema` in documents) |
 | `args` | No | Additional CLI arguments (e.g. `--draft 7 --no-assert-format --json`). When provided without `files`, skips auto-discovery. |
 
+
 ## Supported Drafts
 
 - JSON Schema Draft 4
