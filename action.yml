@@ -1,5 +1,5 @@
 name: 'Validate JSON'
-description: 'Build (with caching) and run json-validator to check JSON/JSONC files against JSON Schema'
+description: 'Download the prebuilt json-validator (build-from-source fallback) and run it to check JSON/JSONC files against JSON Schema'
 branding:
   icon: 'check-circle'
   color: 'green'
@@ -21,64 +21,194 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Setup Go
+    # Logic lives in TypeScript (validated with tsc, run on Node) via the org's
+    # reusable typescript action -- no hand-written, non-portable shell.
+
+    # Fast path: download the prebuilt binary published to pazer.build by the
+    # go-toolchain autorelease (every push to master). Never throws -- on any
+    # failure it sets downloaded=false so the build-from-source fallback runs.
+    - name: Download json-validator
+      id: download
+      uses: wow-look-at-my/actions@typescript#latest
+      with:
+        script: |
+          const platform = os.platform();
+          const arch = os.arch();
+
+          // buildhost os/arch naming, mapped from Node's os module.
+          const osMap: Record<string, string> = { win32: 'windows', darwin: 'darwin', linux: 'linux' };
+          const archMap: Record<string, string> = { x64: 'amd64', arm64: 'arm64' };
+
+          // Go binaries are several MB; a redirect/error body saved by mistake
+          // would be tiny, so this floor rejects a bogus "success".
+          const MIN_SIZE = 1_000_000;
+
+          try {
+            const osName = osMap[platform];
+            const archName = archMap[arch];
+            if (!osName || !archName) {
+              throw new Error(`unsupported platform/arch: ${platform}/${arch}`);
+            }
+
+            // Track the stable master line. buildhost versions are auto-increment
+            // integers (not git tags), and github.action_ref is unavailable inside
+            // a composite sub-step, so pinning to the consumer's ref is infeasible.
+            // Plain "latest" is wrong (a feature-branch push bumps the number);
+            // branch=master follows the stable release the go-toolchain autorelease
+            // publishes on every master push. Anonymous, public download.
+            const url = `https://dl.pazer.build/json-validator?branch=master&os=${osName}&arch=${archName}`;
+
+            const binName = platform === 'win32' ? 'json-validator.exe' : 'json-validator';
+            const binDir = path.join(runner.tool_cache, 'json-validator', 'bin');
+            await io.mkdirP(binDir);
+            const binPath = path.join(binDir, binName);
+
+            core.info(`Downloading prebuilt json-validator: ${url}`);
+
+            let size: number;
+            const g = globalThis as any;
+            if (typeof g.fetch === 'function') {
+              // Node's global fetch follows the branch pointer's 302 automatically.
+              const res = await g.fetch(url);
+              if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+              const buf = Buffer.from(await res.arrayBuffer());
+              fs.writeFileSync(binPath, buf);
+              size = buf.length;
+            } else {
+              // Fallback for a runtime without global fetch: curl (-L follows redirects).
+              await exec.exec('curl', ['-fSL', url, '-o', binPath]);
+              size = fs.statSync(binPath).size;
+            }
+
+            if (size < MIN_SIZE) {
+              throw new Error(`downloaded file is too small (${size} bytes); expected a multi-MB binary`);
+            }
+
+            if (platform !== 'win32') {
+              fs.chmodSync(binPath, 0o755);
+            }
+
+            core.info(`Downloaded ${size} bytes to ${binPath}`);
+            core.setOutput('downloaded', 'true');
+            core.setOutput('binpath', binPath);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            core.warning(`Prebuilt download unavailable, falling back to build from source: ${msg}`);
+            core.setOutput('downloaded', 'false');
+          }
+
+    # Fallback only: set up Go and compile from source when the download failed.
+    - name: Setup Go (fallback)
+      if: steps.download.outputs.downloaded != 'true'
       uses: actions/setup-go@v5
       with:
         go-version-file: '${{ github.action_path }}/go.mod'
         cache: false
 
-    - name: Compute cache key
-      id: cache-key
-      shell: bash
-      run: |
-        HASH=$(find "${{ github.action_path }}" -type f \( -name '*.go' -o -name 'go.sum' -o -name 'go.mod' \) | sort | xargs sha256sum | sha256sum | cut -d' ' -f1)
-        echo "hash=${HASH}" >> "$GITHUB_OUTPUT"
-
-    - name: Cache json-validator binary
-      id: cache
-      uses: actions/cache@v4
+    - name: Build json-validator (fallback)
+      id: build
+      if: steps.download.outputs.downloaded != 'true'
+      uses: wow-look-at-my/actions@typescript#latest
+      env:
+        ACTION_DIR: ${{ github.action_path }}
       with:
-        path: ${{ runner.tool_cache }}/json-validator/bin
-        key: json-validator-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache-key.outputs.hash }}
-
-    - name: Build json-validator
-      if: steps.cache.outputs.cache-hit != 'true'
-      shell: bash
-      working-directory: ${{ github.action_path }}
-      run: |
-        mkdir -p "${{ runner.tool_cache }}/json-validator/bin"
-        go build -o "${{ runner.tool_cache }}/json-validator/bin/json-validator" .
+        script: |
+          const actionDir = process.env.ACTION_DIR ?? '';
+          const binName = process.platform === 'win32' ? 'json-validator.exe' : 'json-validator';
+          const binDir = path.join(runner.tool_cache, 'json-validator', 'bin');
+          await io.mkdirP(binDir);
+          const binPath = path.join(binDir, binName);
+          // Plain `go build` (not go-toolchain): a consumer must never run the
+          // validator's own test suite -- this only compiles the CLI.
+          await exec.exec('go', ['build', '-o', binPath, '.'], { cwd: actionDir });
+          core.setOutput('binpath', binPath);
 
     - name: Run json-validator
-      shell: bash
+      uses: wow-look-at-my/actions@typescript#latest
       env:
-        INPUT_FILES: ${{ inputs.files }}
-        INPUT_SCHEMA: ${{ inputs.schema }}
-        INPUT_ARGS: ${{ inputs.args }}
-        VALIDATOR_BIN: ${{ runner.tool_cache }}/json-validator/bin/json-validator
-      run: |
-        CMD=("$VALIDATOR_BIN")
-        if [ -n "$INPUT_SCHEMA" ]; then
-          CMD+=(--schema "$INPUT_SCHEMA")
-        fi
-        # shellcheck disable=SC2086
-        CMD+=(${INPUT_ARGS})
+        JV_FILES: ${{ inputs.files }}
+        JV_SCHEMA: ${{ inputs.schema }}
+        JV_ARGS: ${{ inputs.args }}
+        JV_DOWNLOADED: ${{ steps.download.outputs.downloaded }}
+        JV_BIN_DOWNLOAD: ${{ steps.download.outputs.binpath }}
+        JV_BIN_FALLBACK: ${{ steps.build.outputs.binpath }}
+      with:
+        script: |
+          // Resolve the binary from whichever path produced it.
+          const downloaded = (process.env.JV_DOWNLOADED ?? '') === 'true';
+          const bin = downloaded
+            ? (process.env.JV_BIN_DOWNLOAD ?? '')
+            : (process.env.JV_BIN_FALLBACK ?? '');
+          if (!bin) {
+            core.setFailed('No json-validator binary available (download and build both failed)');
+            return;
+          }
 
-        if [ -n "$INPUT_FILES" ]; then
-          # shellcheck disable=SC2086
-          CMD+=(${INPUT_FILES})
-        elif [ -z "$INPUT_ARGS" ]; then
-          mapfile -t AUTO_FILES < <(
-            find . -name .git -prune -o -name node_modules -prune -o \
-              \( -name '*.json' -o -name '*.jsonc' \) -print0 |
-            xargs -0 grep -l '"$schema"' 2>/dev/null || true
-          )
-          if [ ${#AUTO_FILES[@]} -eq 0 ]; then
-            echo "No JSON/JSONC files with \$schema found"
-            exit 0
-          fi
-          echo "Auto-discovered ${#AUTO_FILES[@]} file(s) with \$schema"
-          CMD+=("${AUTO_FILES[@]}")
-        fi
+          const filesInput = (process.env.JV_FILES ?? '').trim();
+          const schema = (process.env.JV_SCHEMA ?? '').trim();
+          const extraArgs = (process.env.JV_ARGS ?? '').trim();
 
-        "${CMD[@]}"
+          // Argv layout mirrors the original: [--schema S]? [args...] [files...].
+          const cmd: string[] = [];
+          if (schema) cmd.push('--schema', schema);
+          if (extraArgs) cmd.push(...extraArgs.split(/\s+/));
+
+          // Word-split + glob-expand the files input (the original used unquoted
+          // shell expansion, which both word-splits and globs).
+          const expandFiles = (input: string): string[] => {
+            const out: string[] = [];
+            for (const token of input.split(/\s+/)) {
+              if (!token) continue;
+              if (/[*?[]/.test(token)) {
+                out.push(...fs.globSync(token));
+              } else {
+                out.push(token);
+              }
+            }
+            return out;
+          };
+
+          // Auto-discovery: *.json / *.jsonc files whose text contains "$schema"
+          // (matches the original `find ... | xargs grep -l '"$schema"'`).
+          const discover = (): string[] => {
+            const out: string[] = [];
+            const skip = new Set(['.git', 'node_modules']);
+            const walk = (dir: string): void => {
+              for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+                if (entry.isDirectory()) {
+                  if (!skip.has(entry.name)) walk(path.join(dir, entry.name));
+                } else if (entry.isFile() && (entry.name.endsWith('.json') || entry.name.endsWith('.jsonc'))) {
+                  const full = path.join(dir, entry.name);
+                  try {
+                    if (fs.readFileSync(full, 'utf8').includes('"$schema"')) out.push(full);
+                  } catch {
+                    // unreadable file: skip (the original swallowed grep errors)
+                  }
+                }
+              }
+            };
+            walk('.');
+            return out.sort();
+          };
+
+          let files: string[] = [];
+          if (filesInput) {
+            files = expandFiles(filesInput);
+          } else if (!extraArgs) {
+            // No files and no args: auto-discover. With args but no files, the
+            // original skipped discovery (e.g. `--help`), so we do too.
+            files = discover();
+            if (files.length === 0) {
+              core.info('No JSON/JSONC files with $schema found');
+              return;
+            }
+            core.info(`Auto-discovered ${files.length} file(s) with $schema`);
+          }
+
+          // Single invocation with every file, exactly as the original action did.
+          const finalArgs = [...cmd, ...files];
+          core.info(`Running: json-validator ${finalArgs.join(' ')}`);
+          const code = await exec.exec(bin, finalArgs, { ignoreReturnCode: true });
+          if (code !== 0) {
+            core.setFailed(`json-validator exited with code ${code}`);
+          }
