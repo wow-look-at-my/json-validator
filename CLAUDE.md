@@ -18,7 +18,10 @@ The built binary is output to `build/json-validator`.
 - `cmd/root.go` -- cobra root command (CLI flags, arg handling, output formatting)
 - `internal/validator/validator.go` -- schema loading, compilation, validation logic
 - `testdata/` -- test fixture JSON/JSONC files and schemas
-- `action.yml` -- composite GitHub Action (build with caching + run)
+- `action.yml` -- composite GitHub Action. Downloads the prebuilt binary from
+  pazer.build for the runner's OS/arch (with a build-from-source fallback if the
+  download fails), then runs it. Logic is tsc-checked TypeScript steps via
+  `wow-look-at-my/actions@typescript#latest`, mirroring the xml-validator pattern.
 
 ## Key Design Decisions
 

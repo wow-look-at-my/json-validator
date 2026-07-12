@@ -13,3 +13,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: wow-look-at-my/go-toolchain@v1
+
+  # Exercise the composite action end-to-end on a real runner: this runs the
+  # download-prebuilt path and validates known-good fixtures (exit 0).
+  action-selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
+        with:
+          files: 'testdata/valid.json testdata/valid.jsonc'
+          schema: 'testdata/schema.json'
