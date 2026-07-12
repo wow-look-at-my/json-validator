@@ -11,11 +11,11 @@ import (
 )
 
 var (
-	schemaFlag       string
-	jsonOutputFlag   bool
-	quietFlag        bool
-	draftFlag        string
-	noAssertFormat   bool
+	schemaFlag     string
+	jsonOutputFlag bool
+	quietFlag      bool
+	draftFlag      string
+	noAssertFormat bool
 )
 
 func init() {

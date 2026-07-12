@@ -84,7 +84,7 @@ Schemas can be local file paths or HTTP/HTTPS URLs. Well-known meta-schema URIs 
 
 ## GitHub Action
 
-Use `wow-look-at-my/json-validator` as a GitHub Action to validate JSON/JSONC files in CI. The action builds the tool with caching (subsequent runs skip the build) and runs it.
+Use `wow-look-at-my/json-validator` as a GitHub Action to validate JSON/JSONC files in CI. The action downloads the prebuilt binary from pazer.build for the runner's OS/arch (falling back to a build from source only if the download fails) and runs it.
 
 ### Zero-config (recommended)
 

@@ -1,12 +1,12 @@
 package validator
 
 import (
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func testdataPath(name string) string {
@@ -15,8 +15,8 @@ func testdataPath(name string) string {
 
 func TestParseDraft(t *testing.T) {
 	tests := []struct {
-		input	string
-		wantErr	bool
+		input   string
+		wantErr bool
 	}{
 		{"4", false},
 		{"6", false},
@@ -38,10 +38,10 @@ func TestParseDraft(t *testing.T) {
 
 func TestSilentFailureAllowed(t *testing.T) {
 	tests := []struct {
-		name	string
-		env	string
-		feature	string
-		want	bool
+		name    string
+		env     string
+		feature string
+		want    bool
 	}{
 		{"empty env", "", "assert-format", false},
 		{"comma separated match", "assert-format,other", "assert-format", true},
@@ -63,8 +63,8 @@ func TestSilentFailureAllowed(t *testing.T) {
 
 func TestSplitMulti(t *testing.T) {
 	tests := []struct {
-		input	string
-		want	int
+		input string
+		want  int
 	}{
 		{"", 0},
 		{"a", 1},
@@ -84,30 +84,30 @@ func TestSplitMulti(t *testing.T) {
 
 func TestExtractSchemaURI(t *testing.T) {
 	tests := []struct {
-		name	string
-		doc	any
-		want	string
-		wantErr	bool
+		name    string
+		doc     any
+		want    string
+		wantErr bool
 	}{
 		{
-			name:	"valid $schema",
-			doc:	map[string]any{"$schema": "https://json-schema.org/draft/2020-12/schema"},
-			want:	"https://json-schema.org/draft/2020-12/schema",
+			name: "valid $schema",
+			doc:  map[string]any{"$schema": "https://json-schema.org/draft/2020-12/schema"},
+			want: "https://json-schema.org/draft/2020-12/schema",
 		},
 		{
-			name:		"missing $schema",
-			doc:		map[string]any{"name": "test"},
-			wantErr:	true,
+			name:    "missing $schema",
+			doc:     map[string]any{"name": "test"},
+			wantErr: true,
 		},
 		{
-			name:		"non-object document",
-			doc:		[]any{1, 2, 3},
-			wantErr:	true,
+			name:    "non-object document",
+			doc:     []any{1, 2, 3},
+			wantErr: true,
 		},
 		{
-			name:		"$schema is not a string",
-			doc:		map[string]any{"$schema": 42},
-			wantErr:	true,
+			name:    "$schema is not a string",
+			doc:     map[string]any{"$schema": 42},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
