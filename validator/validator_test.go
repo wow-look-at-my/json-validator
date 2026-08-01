@@ -10,7 +10,7 @@ import (
 )
 
 func testdataPath(name string) string {
-	return filepath.Join("..", "..", "testdata", name)
+	return filepath.Join("..", "testdata", name)
 }
 
 func TestParseDraft(t *testing.T) {

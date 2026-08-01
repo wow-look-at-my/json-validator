@@ -7,7 +7,7 @@ import (
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/spf13/cobra"
-	"github.com/wow-look-at-my/json-validator/internal/validator"
+	"github.com/wow-look-at-my/json-validator/validator"
 )
 
 var (

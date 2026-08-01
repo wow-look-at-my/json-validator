@@ -16,7 +16,13 @@ The built binary is output to `build/json-validator`.
 
 - `main.go` -- entry point
 - `cmd/root.go` -- cobra root command (CLI flags, arg handling, output formatting)
-- `internal/validator/validator.go` -- schema loading, compilation, validation logic
+- `validator/validator.go` -- schema loading, compilation, validation logic.
+  EXPORTED on purpose (it was `internal/`): webhook-runner imports it to
+  validate every hook.json/manager.json against the published schema at LOAD,
+  so the runtime gate and this CLI apply one implementation instead of two.
+  Its API is therefore a real contract -- `NewCompiler`, `CompileSchema`,
+  `Validate`, `ValidateFile`, `Options`, `Result` -- and changing a signature
+  breaks a consumer that is not in this repo.
 - `testdata/` -- test fixture JSON/JSONC files and schemas
 - `action.yml` -- composite GitHub Action. Downloads the prebuilt binary from
   pazer.build for the runner's OS/arch (with a build-from-source fallback if the

@@ -82,6 +82,24 @@ Schemas can be local file paths or HTTP/HTTPS URLs. Well-known meta-schema URIs 
 | 1 | Validation failure or load error |
 | 2 | CLI usage error |
 
+## Use as a Go library
+
+The same validation the CLI performs, importable:
+
+```go
+import "github.com/wow-look-at-my/json-validator/validator"
+
+opts := validator.Options{SchemaPath: "hook.schema.json"}
+c, err := validator.NewCompiler(opts)
+sch, err := validator.CompileSchema(c, opts.SchemaPath)
+res := validator.Validate(bytes.NewReader(doc), "hook.json", sch, opts)
+if !res.Valid { /* res.Error is a *jsonschema.ValidationError */ }
+```
+
+JSONC is handled transparently, exactly as on the CLI. webhook-runner uses this
+to validate every hook.json/manager.json against its published schema at load
+time, so a manifest is checked by the same implementation in CI and at runtime.
+
 ## GitHub Action
 
 Use `wow-look-at-my/json-validator` as a GitHub Action to validate JSON/JSONC files in CI. The action downloads the prebuilt binary from pazer.build for the runner's OS/arch (falling back to a build from source only if the download fails) and runs it.
