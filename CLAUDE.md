@@ -38,6 +38,16 @@ imposes rules the CLI alone would not:
     reintroduce an env read into validation itself: a host program's strictness
     must not depend on its ambient environment.
   - Nothing in `validator/` prints or exits -- results are values.
+  - The CLI's mirror of that rule: **`cmd.Execute()` is what prints a failure
+    to RUN**, and it must keep doing so. `rootCmd` sets `SilenceErrors` so
+    cobra prints nothing, and `main()` only reads the exit code -- so until
+    this existed, a schema that did not exist, was not JSON, or carried an
+    unresolvable `$ref`, plus any mistyped flag, exited 1 having printed
+    NOTHING. Tests drive `Execute()`, never `rootCmd.Execute()`, or they
+    exercise a path `main()` never takes. An INVALID document is the one
+    exception (`errValidationFailed`): already reported per file, so it gets
+    no second line. `--quiet` suppresses RESULTS only -- a failure to run
+    still reaches stderr, the way `grep -q` reports a missing file.
 - `testdata/` -- test fixture JSON/JSONC files and schemas
 - `action.yml` -- composite GitHub Action. Downloads the prebuilt binary from
   pazer.build for the runner's OS/arch (with a build-from-source fallback if the

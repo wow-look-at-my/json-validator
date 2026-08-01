@@ -31,7 +31,9 @@ func runCmd(args ...string) (stdout, stderr string, err error) {
 	rootCmd.SetErr(errBuf)
 	rootCmd.SetArgs(args)
 
-	err = rootCmd.Execute()
+	// Execute(), not rootCmd.Execute(): the error reporting lives there, so
+	// going straight to cobra would test a path main() never takes.
+	err = Execute()
 
 	rootCmd.SetOut(nil)
 	rootCmd.SetErr(nil)
@@ -164,4 +166,62 @@ func TestCLIEnvDisablesFormatAssertions(t *testing.T) {
 	t.Setenv("JSON_VALIDATION_ALLOW_SILENT_FAILURES", "assert-format")
 	_, _, err = runCmd("--schema", testdataPath("schema.json"), doc)
 	assert.NoError(t, err, "the env var must still disable format assertions on the CLI")
+}
+
+// Every way of failing to RUN must say why. Each of these exited 1 printing
+// NOTHING before -- cobra was silenced and main() only read the exit code --
+// which in CI means a red gate with no reason and nothing to search for.
+func TestCLIFailuresToRunAreReported(t *testing.T) {
+	dir := t.TempDir()
+	notJSON := filepath.Join(dir, "not-a-schema.json")
+	require.NoError(t, os.WriteFile(notJSON, []byte("this is not json"), 0o644))
+	danglingRef := filepath.Join(dir, "dangling.schema.json")
+	require.NoError(t, os.WriteFile(danglingRef, []byte(
+		`{"$schema":"https://json-schema.org/draft/2020-12/schema",`+
+			`"$id":"https://example.test/dangling.schema.json",`+
+			`"allOf":[{"$ref":"nowhere.schema.json"}]}`), 0o644))
+
+	cases := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"schema file missing", []string{"--schema", filepath.Join(dir, "nope.json"), testdataPath("valid.json")}, "nope.json"},
+		{"schema is not JSON", []string{"--schema", notJSON, testdataPath("valid.json")}, "not-a-schema.json"},
+		{"schema $ref unresolvable", []string{"--schema", danglingRef, testdataPath("valid.json")}, "dangling.schema.json"},
+		{"unknown flag", []string{"--bogus", testdataPath("valid.json")}, "bogus"},
+		{"mutually exclusive flags", []string{"--json", "--quiet", testdataPath("valid.json")}, "quiet"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			_, stderr, err := runCmd(c.args...)
+			require.Error(t, err)
+			assert.Contains(t, stderr, "json-validator:", "the failure must reach stderr, not just the exit code")
+			assert.Contains(t, stderr, c.want, "the message must name what went wrong")
+		})
+	}
+}
+
+// --quiet governs RESULTS, not the tool's ability to run: `grep -q` still
+// reports a missing file. A silent quiet-mode compile failure is the same
+// invisible red this fix exists to remove.
+func TestCLIQuietStillReportsAFailureToRun(t *testing.T) {
+	_, stderr, err := runCmd("--quiet", "--schema", filepath.Join(t.TempDir(), "absent.json"), testdataPath("valid.json"))
+	require.Error(t, err)
+	assert.Contains(t, stderr, "json-validator:")
+	assert.Contains(t, stderr, "absent.json")
+}
+
+// The other half of the contract: an INVALID document is the ordinary negative
+// result, already reported per file, so Execute must not bolt a second
+// "validation failed" line onto it -- and --quiet must stay silent.
+func TestCLIInvalidDocumentIsNotDoubleReported(t *testing.T) {
+	_, stderr, err := runCmd("--schema", testdataPath("schema.json"), testdataPath("invalid.json"))
+	require.Error(t, err)
+	assert.Contains(t, stderr, "INVALID")
+	assert.NotContains(t, stderr, "json-validator:", "an invalid document is a result, not a failure to run")
+
+	_, quietErr, err := runCmd("--quiet", "--schema", testdataPath("schema.json"), testdataPath("invalid.json"))
+	require.Error(t, err)
+	assert.Empty(t, quietErr, "--quiet means exit code only for results")
 }
