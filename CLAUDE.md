@@ -48,6 +48,17 @@ imposes rules the CLI alone would not:
     exception (`errValidationFailed`): already reported per file, so it gets
     no second line. `--quiet` suppresses RESULTS only -- a failure to run
     still reaches stderr, the way `grep -q` reports a missing file.
+- `dats/` -- **CLI-contract tests: exit codes and the messages that go with
+  them.** Black-box, run by the org's [dats](https://github.com/wow-look-at-my/dats)
+  runner against the REAL built binary; go-toolchain runs them automatically as
+  its dats phase after every build, so there is nothing to wire into CI. Suites
+  declare `sandbox: false` and exec the binary as
+  `"${GO_TOOLCHAIN_DATS_BUILD_DIR:-build}/json-validator"` (the phase stages
+  throwaway copies under that dir and does NOT put them on PATH; the `:-build`
+  fallback keeps a standalone `dats test dats` working). New exit-code or
+  stderr-contract behavior belongs HERE, not in `cmd/*_test.go`: the in-process
+  tests drive cobra and cannot see what the shipped binary prints, which is
+  exactly how every failure-to-run went silent unnoticed.
 - `testdata/` -- test fixture JSON/JSONC files and schemas
 - `action.yml` -- composite GitHub Action. Downloads the prebuilt binary from
   pazer.build for the runner's OS/arch (with a build-from-source fallback if the
