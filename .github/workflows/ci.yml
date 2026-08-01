@@ -12,6 +12,19 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Job-level permissions REPLACE the workflow-level set, so this repeats the
+    # four this job already had and adds the two the buildhost publish needs:
+    # go-toolchain registers a GitHub Deployment for the publish and records
+    # each artifact on the org's linked-artifacts page. Both are part of
+    # publishing rather than something a repo can decline -- without them the
+    # publish step fails the build.
+    permissions:
+      id-token: write
+      contents: write
+      actions: read
+      checks: read
+      deployments: write
+      artifact-metadata: write
     steps:
       - uses: actions/checkout@v4
       - uses: wow-look-at-my/go-toolchain@v1

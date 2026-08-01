@@ -82,6 +82,58 @@ Schemas can be local file paths or HTTP/HTTPS URLs. Well-known meta-schema URIs 
 | 1 | Validation failure or load error |
 | 2 | CLI usage error |
 
+## Use as a Go library
+
+The CLI is one consumer of `validator`; embedding it in another Go program is
+the other, equally supported one. webhook-runner validates every hook.json
+against its published schema at load through this package, so a manifest is
+checked by the same implementation in CI and at runtime.
+
+A schema compiled into your binary, validated repeatedly (the usual server
+shape):
+
+```go
+import "github.com/wow-look-at-my/json-validator/validator"
+
+//go:embed hook.schema.json
+var hookSchema []byte
+
+v, err := validator.NewFromBytes("embedded:hook.schema.json", hookSchema, validator.Options{})
+// ...
+res := v.ValidateBytes(manifest, "hook.json")
+if err := res.AsError(); err != nil {
+    return fmt.Errorf("hook.json does not match the schema: %w", err)
+}
+```
+
+A schema on disk or at a URL:
+
+```go
+v, err := validator.New(validator.Options{SchemaPath: "schema.json"})
+res := v.ValidateFile("config.json")
+```
+
+With no `SchemaPath`, each document's own `$schema` decides -- the CLI's
+default mode.
+
+What the library guarantees to a host program:
+
+- **The zero value of `Options` works** -- draft 2020-12, format assertions on.
+  Defaults live in the library, not in the CLI's flag definitions.
+- **Behavior follows `Options` alone.** The package reads NO environment
+  variables; the CLI resolves `JSON_VALIDATION_ALLOW_SILENT_FAILURES` into an
+  option itself (`validator.SilentFailureAllowed` is exported if you want the
+  same escape hatch, explicitly). A library whose strictness depends on ambient
+  env is a trap for the program embedding it.
+- **Schemas can come from memory** (`NewFromBytes`, `CompileBytes`), so no file
+  or network access is required at validation time.
+- **Compile once, validate many.** A `Validator` is safe for concurrent use.
+- **Nothing prints or exits.** `Result.AsError()` gives you an error;
+  `Result.Detail()` gives one actionable line per failing location, which is
+  what a log line or a load error wants instead of a nested tree.
+- JSONC (comments, trailing commas) is accepted for both schema and document,
+  exactly as on the CLI.
+
 ## GitHub Action
 
 Use `wow-look-at-my/json-validator` as a GitHub Action to validate JSON/JSONC files in CI. The action downloads the prebuilt binary from pazer.build for the runner's OS/arch (falling back to a build from source only if the download fails) and runs it.

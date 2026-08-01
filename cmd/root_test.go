@@ -149,3 +149,19 @@ func TestCLIJSONOutputInvalid(t *testing.T) {
 	assert.False(t, !strings.Contains(stdout, `"valid": false`) || !strings.Contains(stdout, `"errors"`))
 
 }
+
+// The documented env escape hatch (JSON_VALIDATION_ALLOW_SILENT_FAILURES)
+// lives at the CLI boundary: the library reads no environment, so the CLI is
+// what turns the variable into the option it stands for. Asserted end to end,
+// because "the flag exists" is not the same claim.
+func TestCLIEnvDisablesFormatAssertions(t *testing.T) {
+	doc := filepath.Join(t.TempDir(), "bad-format.json")
+	require.NoError(t, os.WriteFile(doc, []byte(`{"name":"Test","email":"not-an-email"}`), 0o644))
+
+	_, _, err := runCmd("--schema", testdataPath("schema.json"), doc)
+	require.Error(t, err, "format assertions are on by default")
+
+	t.Setenv("JSON_VALIDATION_ALLOW_SILENT_FAILURES", "assert-format")
+	_, _, err = runCmd("--schema", testdataPath("schema.json"), doc)
+	assert.NoError(t, err, "the env var must still disable format assertions on the CLI")
+}

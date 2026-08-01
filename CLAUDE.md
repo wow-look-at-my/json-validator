@@ -16,7 +16,28 @@ The built binary is output to `build/json-validator`.
 
 - `main.go` -- entry point
 - `cmd/root.go` -- cobra root command (CLI flags, arg handling, output formatting)
-- `internal/validator/validator.go` -- schema loading, compilation, validation logic
+- `validator/validator.go` -- schema loading, compilation, validation logic;
+  `Options`, `Result` (+ `AsError`/`Detail`), `NewCompiler`, `CompileSchema`,
+  `Validate`, `ValidateFile`.
+- `validator/embed.go` -- the EMBEDDING surface: `Validator` (compile once,
+  validate many, concurrency-safe), `New`, `NewFromBytes`, `CompileBytes`,
+  `ValidateBytes`.
+
+**This package is consumed two ways and both are first-class**: the CLI/action
+here, and as a library inside other Go programs (webhook-runner validates every
+hook.json/manager.json against the published schema at LOAD through it, so the
+runtime gate and CI are one implementation). That makes its API a real
+contract -- a signature change breaks a consumer in another repo -- and it
+imposes rules the CLI alone would not:
+
+  - The ZERO VALUE of `Options` must stay usable (draft 2020-12, format
+    assertions on). Defaults belong here, never in the flag definitions.
+  - The library reads NO environment. `JSON_VALIDATION_ALLOW_SILENT_FAILURES`
+    is resolved by `cmd/root.go` into `Options.NoAssertFormat`
+    (`SilentFailureAllowed` is exported for anyone wanting it explicitly). Never
+    reintroduce an env read into validation itself: a host program's strictness
+    must not depend on its ambient environment.
+  - Nothing in `validator/` prints or exits -- results are values.
 - `testdata/` -- test fixture JSON/JSONC files and schemas
 - `action.yml` -- composite GitHub Action. Downloads the prebuilt binary from
   pazer.build for the runner's OS/arch (with a build-from-source fallback if the

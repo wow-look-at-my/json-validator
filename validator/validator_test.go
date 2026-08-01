@@ -10,7 +10,7 @@ import (
 )
 
 func testdataPath(name string) string {
-	return filepath.Join("..", "..", "testdata", name)
+	return filepath.Join("..", "testdata", name)
 }
 
 func TestParseDraft(t *testing.T) {
@@ -54,7 +54,7 @@ func TestSilentFailureAllowed(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv("JSON_VALIDATION_ALLOW_SILENT_FAILURES", tt.env)
-			got := silentFailureAllowed(tt.feature)
+			got := SilentFailureAllowed(tt.feature)
 			assert.Equal(t, tt.want, got)
 
 		})
@@ -306,9 +306,12 @@ func TestFormatAssertions(t *testing.T) {
 
 	})
 
-	t.Run("format not enforced via env var", func(t *testing.T) {
+	// The env escape hatch is the CLI's, NOT the library's: an embedded
+	// validator whose strictness silently depends on the host process's
+	// environment is a trap. cmd/root_test.go covers the CLI end of it.
+	t.Run("the env var does NOT reach the library", func(t *testing.T) {
 		t.Setenv("JSON_VALIDATION_ALLOW_SILENT_FAILURES", "assert-format")
-		opts := Options{SchemaPath: schemaPath, Draft: "2020"}
+		opts := Options{SchemaPath: schemaPath}
 		c, err := NewCompiler(opts)
 		require.Nil(t, err)
 
@@ -319,8 +322,7 @@ func TestFormatAssertions(t *testing.T) {
 		r := Validate(input, "<test>", sch, opts)
 		require.Nil(t, r.Err)
 
-		assert.True(t, r.Valid)
-
+		assert.False(t, r.Valid, "Options alone decides: format assertions stay on")
 	})
 }
 
