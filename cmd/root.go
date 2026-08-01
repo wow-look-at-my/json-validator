@@ -59,10 +59,13 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// The library reads no environment: behavior must follow from Options
+	// alone for the programs that embed it. So the documented env escape
+	// hatch is resolved HERE and folded into the option it stands for.
 	opts := validator.Options{
 		SchemaPath:     schemaFlag,
 		Draft:          draftFlag,
-		NoAssertFormat: noAssertFormat,
+		NoAssertFormat: noAssertFormat || validator.SilentFailureAllowed("assert-format"),
 	}
 
 	var compiled *jsonschema.Schema
