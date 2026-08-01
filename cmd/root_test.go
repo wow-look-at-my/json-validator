@@ -31,7 +31,9 @@ func runCmd(args ...string) (stdout, stderr string, err error) {
 	rootCmd.SetErr(errBuf)
 	rootCmd.SetArgs(args)
 
-	err = rootCmd.Execute()
+	// Execute(), not rootCmd.Execute(): the error reporting lives there, so
+	// going straight to cobra would test a path main() never takes.
+	err = Execute()
 
 	rootCmd.SetOut(nil)
 	rootCmd.SetErr(nil)

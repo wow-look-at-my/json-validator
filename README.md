@@ -43,7 +43,7 @@ JSONC (JSON with Comments) is supported transparently. Line comments (`//`), blo
 |------|-------|---------|-------------|
 | `--schema` | `-s` | | Path or URL to JSON Schema (overrides `$schema` in document) |
 | `--json` | | `false` | Output errors as JSON |
-| `--quiet` | `-q` | `false` | Suppress output; exit code only |
+| `--quiet` | `-q` | `false` | Suppress results; exit code only. A failure to run still prints to stderr |
 | `--draft` | `-d` | `2020` | Default draft version when schema has no `$schema` (4, 6, 7, 2019, 2020) |
 | `--no-assert-format` | | `false` | Disable format assertions |
 

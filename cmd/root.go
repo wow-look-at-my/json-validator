@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 
@@ -47,8 +48,32 @@ JSON_VALIDATION_ALLOW_SILENT_FAILURES=assert-format`,
 	RunE:          run,
 }
 
+// errValidationFailed marks the ordinary negative result -- documents were
+// read and found invalid -- as distinct from a failure to run at all. Each one
+// has already been reported per file (or --quiet asked for silence), so
+// Execute prints nothing further for it; the exit code carries it.
+var errValidationFailed = errors.New("validation failed")
+
+// Execute runs the CLI and reports any failure that is NOT an ordinary invalid
+// document on stderr.
+//
+// This is load-bearing. rootCmd sets SilenceErrors, so cobra prints nothing
+// itself, and main() only reads the exit code -- which left every way of
+// failing to RUN silent: a schema that does not exist, one that is not valid
+// JSON, one whose $ref cannot be resolved, a mistyped flag. All of them exited
+// 1 having printed NOTHING, the worst failure mode for a gate CI depends on:
+// red with no reason, and nothing to search for.
+//
+// --quiet does not suppress this. It means "exit code only" about RESULTS, the
+// way `grep -q` still prints "No such file or directory" for a missing file:
+// suppressing the answer is not the same as hiding the fact that no answer
+// could be computed.
 func Execute() error {
-	return rootCmd.Execute()
+	err := rootCmd.Execute()
+	if err != nil && !errors.Is(err, errValidationFailed) {
+		fmt.Fprintf(rootCmd.ErrOrStderr(), "json-validator: %v\n", err)
+	}
+	return err
 }
 
 func run(cmd *cobra.Command, args []string) error {
@@ -94,7 +119,7 @@ func run(cmd *cobra.Command, args []string) error {
 
 	for _, r := range results {
 		if !r.Valid || r.Err != nil {
-			return fmt.Errorf("validation failed")
+			return errValidationFailed
 		}
 	}
 	return nil
