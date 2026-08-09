@@ -39,8 +39,7 @@ runs:
           const osMap: Record<string, string> = { win32: 'windows', darwin: 'darwin', linux: 'linux' };
           const archMap: Record<string, string> = { x64: 'amd64', arm64: 'arm64' };
 
-          // Go binaries are several MB; a redirect/error body saved by mistake
-          // would be tiny, so this floor rejects a bogus "success".
+          // a redirect/error body saved by mistake would be tiny -- this floor rejects a bogus "success"
           const MIN_SIZE = 1_000_000;
 
           try {
@@ -50,12 +49,7 @@ runs:
               throw new Error(`unsupported platform/arch: ${platform}/${arch}`);
             }
 
-            // Track the stable master line. buildhost versions are auto-increment
-            // integers (not git tags), and github.action_ref is unavailable inside
-            // a composite sub-step, so pinning to the consumer's ref is infeasible.
-            // Plain "latest" is wrong (a feature-branch push bumps the number);
-            // branch=master follows the stable release the go-toolchain autorelease
-            // publishes on every master push. Anonymous, public download.
+            // branch=master tracks the stable release (auto-increment version numbers, no git tags; github.action_ref is unavailable in a composite sub-step) -- anonymous, public download
             const url = `https://dl.pazer.build/json-validator?branch=master&os=${osName}&arch=${archName}`;
 
             const binName = platform === 'win32' ? 'json-validator.exe' : 'json-validator';
@@ -118,8 +112,7 @@ runs:
           const binDir = path.join(runner.tool_cache, 'json-validator', 'bin');
           await io.mkdirP(binDir);
           const binPath = path.join(binDir, binName);
-          // Plain `go build` (not go-toolchain): a consumer must never run the
-          // validator's own test suite -- this only compiles the CLI.
+          // plain `go build`, not go-toolchain -- a consumer must never run the validator's own test suite
           await exec.exec('go', ['build', '-o', binPath, '.'], { cwd: actionDir });
           core.setOutput('binpath', binPath);
 
@@ -153,8 +146,7 @@ runs:
           if (schema) cmd.push('--schema', schema);
           if (extraArgs) cmd.push(...extraArgs.split(/\s+/));
 
-          // Word-split + glob-expand the files input (the original used unquoted
-          // shell expansion, which both word-splits and globs).
+          // word-split + glob-expand the files input, matching the original's unquoted shell expansion
           const expandFiles = (input: string): string[] => {
             const out: string[] = [];
             for (const token of input.split(/\s+/)) {
@@ -168,8 +160,7 @@ runs:
             return out;
           };
 
-          // Auto-discovery: *.json / *.jsonc files whose text contains "$schema"
-          // (matches the original `find ... | xargs grep -l '"$schema"'`).
+          // auto-discovery: *.json/*.jsonc files containing "$schema", matching the original's find | xargs grep -l
           const discover = (): string[] => {
             const out: string[] = [];
             const skip = new Set(['.git', 'node_modules']);
@@ -195,8 +186,7 @@ runs:
           if (filesInput) {
             files = expandFiles(filesInput);
           } else if (!extraArgs) {
-            // No files and no args: auto-discover. With args but no files, the
-            // original skipped discovery (e.g. `--help`), so we do too.
+            // no files and no args: auto-discover; with args but no files (e.g. --help), skip discovery like the original did
             files = discover();
             if (files.length === 0) {
               core.info('No JSON/JSONC files with $schema found');
