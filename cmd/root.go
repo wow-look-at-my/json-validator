@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/spf13/cobra"
@@ -169,8 +171,20 @@ func printJSON(cmd *cobra.Command, results []validator.Result) error {
 			out[i].Error = r.Err.Error()
 		}
 		if r.Error != nil {
-			out[i].Errors = r.Error.BasicOutput()
+			out[i].Errors = sortedBasicOutput(r.Error.BasicOutput())
 		}
 	}
 	return writeJSON(cmd.OutOrStdout(), out, !ineffectiveJSON)
+}
+
+// sortedBasicOutput orders the errors by instance location, then keyword
+// location, so the same document always prints the same JSON.
+func sortedBasicOutput(u *jsonschema.OutputUnit) *jsonschema.OutputUnit {
+	slices.SortStableFunc(u.Errors, func(a, b jsonschema.OutputUnit) int {
+		if c := cmp.Compare(a.InstanceLocation, b.InstanceLocation); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.KeywordLocation, b.KeywordLocation)
+	})
+	return u
 }

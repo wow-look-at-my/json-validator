@@ -83,6 +83,14 @@ func TestCLIJSONOutputAddsTrailingCommasToErrors(t *testing.T) {
 	assert.NotNil(t, got[0]["errors"])
 }
 
+func TestCLIJSONErrorsPrintInOneOrder(t *testing.T) {
+	first, _, _ := runCmd("--json", "--schema", testdataPath("schema.json"), testdataPath("invalid.json"))
+	for range 20 {
+		again, _, _ := runCmd("--json", "--schema", testdataPath("schema.json"), testdataPath("invalid.json"))
+		require.Equal(t, first, again)
+	}
+}
+
 func TestCLIIneffectiveJSONWritesStrictJSON(t *testing.T) {
 	for _, doc := range []string{"valid.json", "invalid.json"} {
 		t.Run(doc, func(t *testing.T) {
