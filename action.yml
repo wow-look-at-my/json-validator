@@ -21,12 +21,8 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    # Logic lives in TypeScript (validated with tsc, run on Node) via the org's
-    # reusable typescript action -- no hand-written, non-portable shell.
+    # Logic lives in TypeScript (validated with tsc, run on Node) via the org's reusable typescript action -- no hand-written, non-portable shell. Fast path: download the prebuilt binary published to pazer.build by the go-toolchain autorelease (every push to master). Never throws -- on any failure it sets downloaded=false so the build-from-source fallback runs.
 
-    # Fast path: download the prebuilt binary published to pazer.build by the
-    # go-toolchain autorelease (every push to master). Never throws -- on any
-    # failure it sets downloaded=false so the build-from-source fallback runs.
     - name: Download json-validator
       id: download
       uses: wow-look-at-my/actions@typescript#latest

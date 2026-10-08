@@ -105,13 +105,9 @@ Schemas can be local file paths or HTTP/HTTPS URLs. Well-known meta-schema URIs 
 
 ## Use as a Go library
 
-The CLI is one consumer of `validator`; embedding it in another Go program is
-the other, equally supported one. webhook-runner validates every hook.json
-against its published schema at load through this package, so a manifest is
-checked by the same implementation in CI and at runtime.
+The CLI is one consumer of `validator`. Embedding it in another Go program is the other, equally supported one. webhook-runner validates every hook.json. Against its published schema at load through this package. A manifest is checked by the same implementation in CI and at runtime.
 
-A schema compiled into your binary, validated repeatedly (the usual server
-shape):
+A schema compiled into your binary, validated repeatedly (the usual server shape):
 
 ```go
 import "github.com/wow-look-at-my/json-validator/validator"
@@ -134,26 +130,16 @@ v, err := validator.New(validator.Options{SchemaPath: "schema.json"})
 res := v.ValidateFile("config.json")
 ```
 
-With no `SchemaPath`, each document's own `$schema` decides -- the CLI's
-default mode.
+With no `SchemaPath`, each document's own `$schema` decides -- the CLI's default mode.
 
 What the library guarantees to a host program:
 
-- **The zero value of `Options` works** -- draft 2020-12, format assertions on.
-  Defaults live in the library, not in the CLI's flag definitions.
-- **Behavior follows `Options` alone.** The package reads NO environment
-  variables; the CLI resolves `JSON_VALIDATION_ALLOW_SILENT_FAILURES` into an
-  option itself (`validator.SilentFailureAllowed` is exported if you want the
-  same escape hatch, explicitly). A library whose strictness depends on ambient
-  env is a trap for the program embedding it.
-- **Schemas can come from memory** (`NewFromBytes`, `CompileBytes`), so no file
-  or network access is required at validation time.
+- **The zero value of `Options` works** -- draft 2020-12, format assertions on. Defaults live in the library, not in the CLI's flag definitions.
+- **Behavior follows `Options` alone.** The package reads NO environment variables. The CLI resolves `JSON_VALIDATION_ALLOW_SILENT_FAILURES` into an option itself (`validator.SilentFailureAllowed` is exported if you want the same escape hatch, explicitly). A library whose strictness depends on ambient env is a trap for the program embedding it.
+- **Schemas can come from memory** (`NewFromBytes`, `CompileBytes`), so no file or network access is required at validation time.
 - **Compile once, validate many.** A `Validator` is safe for concurrent use.
-- **Nothing prints or exits.** `Result.AsError()` gives you an error;
-  `Result.Detail()` gives one actionable line per failing location, which is
-  what a log line or a load error wants instead of a nested tree.
-- JSONC (comments, trailing commas) is accepted for both schema and document,
-  exactly as on the CLI.
+- **Nothing prints or exits.** `Result.AsError()` gives you an error. `Result.Detail()` gives one actionable line per failing location, which is what a log line or a load error wants instead of a nested tree.
+- JSONC (comments, trailing commas) is accepted for both schema and document, exactly as on the CLI.
 
 ## GitHub Action
 
