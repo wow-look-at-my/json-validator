@@ -22,6 +22,7 @@ func runCmd(args ...string) (stdout, stderr string, err error) {
 	quietFlag = false
 	draftFlag = "2020"
 	noAssertFormat = false
+	ineffectiveJSON = false
 	rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 
 	outBuf := &bytes.Buffer{}

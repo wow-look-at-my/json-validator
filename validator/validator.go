@@ -129,7 +129,7 @@ func NewCompiler(opts Options) (*jsonschema.Compiler, error) {
 	}
 
 	c.UseLoader(jsonschema.SchemeURLLoader{
-		"file":  jsonschema.FileLoader{},
+		"file":  fileLoader{},
 		"http":  httpLoader{client: http.DefaultClient},
 		"https": httpLoader{client: http.DefaultClient},
 	})
@@ -151,6 +151,12 @@ func Validate(r io.Reader, filename string, compiled *jsonschema.Schema, opts Op
 // accepts is JSONC, on the CLI and in a host program alike.
 func stripJSONC(raw []byte) []byte { return jsonc.ToJSON(raw) }
 
+// parseJSONC parses one JSONC value: a comment is whitespace, and a comma
+// before a closing } or ] is allowed.
+func parseJSONC(raw []byte) (any, error) {
+	return jsonschema.UnmarshalJSON(bytes.NewReader(stripJSONC(raw)))
+}
+
 func doValidate(r io.Reader, filename string, compiled *jsonschema.Schema, opts Options) Result {
 	res := Result{File: filename}
 
@@ -160,8 +166,7 @@ func doValidate(r io.Reader, filename string, compiled *jsonschema.Schema, opts 
 		return res
 	}
 
-	cleaned := stripJSONC(raw)
-	doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(cleaned))
+	doc, err := parseJSONC(raw)
 	if err != nil {
 		res.Err = fmt.Errorf("parsing JSON: %w", err)
 		return res
@@ -286,5 +291,24 @@ func (l httpLoader) Load(url string) (any, error) {
 		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, url)
 	}
 
-	return jsonschema.UnmarshalJSON(resp.Body)
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return parseJSONC(raw)
+}
+
+// fileLoader reads a file:// schema as JSONC, like every other input.
+type fileLoader struct{}
+
+func (fileLoader) Load(url string) (any, error) {
+	path, err := jsonschema.FileLoader{}.ToFile(url)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return parseJSONC(raw)
 }

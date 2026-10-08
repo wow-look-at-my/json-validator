@@ -26,8 +26,11 @@ json-validator --schema https://example.com/schema.json config.json
 # Read from stdin
 cat config.json | json-validator --schema schema.json
 
-# JSON output
+# JSON output (trailing commas after the last member of multi-line containers)
 json-validator --json config.json
+
+# Strict JSON output, for a parser such as jq that rejects trailing commas
+json-validator --json --ineffective-json config.json
 
 # Quiet mode (exit code only)
 json-validator --quiet config.json && echo "valid"
@@ -35,14 +38,32 @@ json-validator --quiet config.json && echo "valid"
 
 ## JSONC Support
 
-JSONC (JSON with Comments) is supported transparently. Line comments (`//`), block comments (`/* */`), and trailing commas are stripped before validation. Both `.json` and `.jsonc` files work.
+JSONC (JSON with Comments) is supported transparently. Line comments (`//`), block comments (`/* */`). Trailing commas are accepted in every document and every schema, whether it comes from memory, a file or a URL. A comma before a closing `}` or `]` is valid, with any whitespace or comments between them. Both `.json` and `.jsonc` files work.
+
+Validation never writes an input file, so a trailing comma in a document or a schema stays where it is.
+
+## Trailing commas in JSON output
+
+`--json` writes a trailing comma after the last member of every object and array that spans lines:
+
+```json
+[
+  {
+    "file": "config.json",
+    "valid": true,
+  },
+]
+```
+
+`--ineffective-json` turns that off, and `--json` then writes strict JSON. Use it when a strict parser such as `jq` or `JSON.parse` reads the output.
 
 ## Flags
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--schema` | `-s` | | Path or URL to JSON Schema (overrides `$schema` in document) |
-| `--json` | | `false` | Output errors as JSON |
+| `--json` | | `false` | Output errors as JSON, with a trailing comma after the last member of every multi-line object and array |
+| `--ineffective-json` | | `false` | With `--json`, write strict JSON: no trailing commas |
 | `--quiet` | `-q` | `false` | Suppress results; exit code only. A failure to run still prints to stderr |
 | `--draft` | `-d` | `2020` | Default draft version when schema has no `$schema` (4, 6, 7, 2019, 2020) |
 | `--no-assert-format` | | `false` | Disable format assertions |

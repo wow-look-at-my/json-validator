@@ -46,6 +46,58 @@ tests:
 		stdout:
 			- "valid"
 
+	- desc: trailing commas in the schema file and the document are valid
+	  cmd: '"${GO_TOOLCHAIN_DATS_BUILD_DIR:-build}/json-validator" --schema {inputs.schema.json} {inputs.doc.json}'
+	  inputs:
+		files:
+			schema.json: |
+				{
+				  "$schema": "https://json-schema.org/draft/2020-12/schema",
+				  "type": "object",
+				  "properties": { "tags": { "type": "array", "items": { "type": "string", }, }, },
+				  "required": ["tags",], // last member
+				}
+			doc.json: |
+				{
+				  "tags": ["a", "b", /* end */ ],
+				}
+	  exit: 0
+	  outputs:
+		stdout:
+			- "valid"
+
+	- desc: json output ends every multi-line object and array with a trailing comma
+	  cmd: '"${GO_TOOLCHAIN_DATS_BUILD_DIR:-build}/json-validator" --json --schema {inputs.schema.json} {inputs.doc.json}'
+	  inputs:
+		files:
+			schema.json: |
+				{"type": "object"}
+			doc.json: |
+				{"name": "ok"}
+	  exit: 0
+	  outputs:
+		stdout:
+			0: "^\\[$"
+			3: "^    \"valid\": true,$"
+			4: "^  },$"
+			5: "^\\]$"
+
+	- desc: ineffective-json writes json output with no trailing commas
+	  cmd: '"${GO_TOOLCHAIN_DATS_BUILD_DIR:-build}/json-validator" --json --ineffective-json --schema {inputs.schema.json} {inputs.doc.json}'
+	  inputs:
+		files:
+			schema.json: |
+				{"type": "object"}
+			doc.json: |
+				{"name": "ok"}
+	  exit: 0
+	  outputs:
+		stdout:
+			0: "^\\[$"
+			3: "^    \"valid\": true$"
+			4: "^  }$"
+			5: "^\\]$"
+
 	- desc: an invalid document exits 1 and reports the violation
 	  cmd: '"${GO_TOOLCHAIN_DATS_BUILD_DIR:-build}/json-validator" --schema {inputs.schema.json} {inputs.bad.json}'
 	  inputs:

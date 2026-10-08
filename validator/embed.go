@@ -69,7 +69,7 @@ func CompileBytes(name string, schema []byte, opts Options) (*jsonschema.Schema,
 	if err != nil {
 		return nil, err
 	}
-	doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(stripJSONC(schema)))
+	doc, err := parseJSONC(schema)
 	if err != nil {
 		return nil, fmt.Errorf("schema %s is not valid JSON: %w", name, err)
 	}

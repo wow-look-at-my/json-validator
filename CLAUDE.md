@@ -68,11 +68,13 @@ imposes rules the CLI alone would not:
 ## Key Design Decisions
 
 - Format assertions are **on by default** (unlike the JSON Schema 2020-12 spec default). Disable with `--no-assert-format` or `JSON_VALIDATION_ALLOW_SILENT_FAILURES=assert-format`.
-- JSONC support is transparent -- all input runs through `jsonc.ToJSON()` before parsing.
+- JSONC support is transparent. Every input runs through `parseJSONC` in `validator/validator.go`: a document, an in-memory schema, a schema file (`fileLoader`) and a fetched schema (`httpLoader`). A comma before a closing `}` or `]` is valid, with whitespace or comments between them. `validator/trailing_comma_test.go` holds the cases.
+- Nothing writes an input back. `jsonc.ToJSON()` works on a copy in memory, so a trailing comma in a document or a schema file stays. `TestCLIKeepsTrailingCommasInInputs` proves it in every CLI mode.
+- `--json` is the path that writes JSON. `cmd/output.go` adds a trailing comma after the last member of every multi-line object and array. `--ineffective-json` turns that off for a strict parser. `dats/cli.dats` pins both outputs.
 - `$schema` in the document is used to auto-detect the schema when `--schema` flag is not provided.
 
 ## Dependencies
 
 - `github.com/santhosh-tekuri/jsonschema/v6` -- JSON Schema validation engine
-- `github.com/tidwall/jsonc` -- JSONC comment/trailing comma stripping
+- `github.com/tidwall/jsonc` -- turns JSONC into JSON for the parser, in memory
 - `github.com/spf13/cobra` -- CLI framework

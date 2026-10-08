@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -12,16 +11,18 @@ import (
 )
 
 var (
-	schemaFlag     string
-	jsonOutputFlag bool
-	quietFlag      bool
-	draftFlag      string
-	noAssertFormat bool
+	schemaFlag      string
+	jsonOutputFlag  bool
+	quietFlag       bool
+	draftFlag       string
+	noAssertFormat  bool
+	ineffectiveJSON bool
 )
 
 func init() {
 	rootCmd.Flags().StringVarP(&schemaFlag, "schema", "s", "", "path or URL to JSON Schema (overrides $schema in document)")
-	rootCmd.Flags().BoolVar(&jsonOutputFlag, "json", false, "output errors as JSON")
+	rootCmd.Flags().BoolVar(&jsonOutputFlag, "json", false, "output errors as JSON, with a trailing comma after the last member of every multi-line object and array")
+	rootCmd.Flags().BoolVar(&ineffectiveJSON, "ineffective-json", false, "with --json, write strict JSON: no trailing commas")
 	rootCmd.Flags().BoolVarP(&quietFlag, "quiet", "q", false, "suppress output; exit code only")
 	rootCmd.Flags().StringVarP(&draftFlag, "draft", "d", "2020", "default draft version when schema has no $schema (4, 6, 7, 2019, 2020)")
 	rootCmd.Flags().BoolVar(&noAssertFormat, "no-assert-format", false, "disable format assertions (format becomes annotation-only per spec)")
@@ -38,7 +39,11 @@ By default, the schema is determined from the $schema field in each document.
 Use --schema to override with a local file path or URL.
 
 Supports JSON with Comments (JSONC): // line comments, /* block comments */,
-and trailing commas are stripped before validation.
+and trailing commas are accepted in every document and schema. Validation
+never rewrites an input file, so a trailing comma in it stays.
+
+--json output writes a trailing comma after the last member of every
+multi-line object and array. Add --ineffective-json for strict JSON.
 
 Format assertions (email, date-time, uri, etc.) are enforced by default.
 Use --no-assert-format to disable, or set the environment variable
@@ -183,7 +188,5 @@ func printJSON(cmd *cobra.Command, results []validator.Result) error {
 			out[i].Errors = r.Error.BasicOutput()
 		}
 	}
-	enc := json.NewEncoder(cmd.OutOrStdout())
-	enc.SetIndent("", "  ")
-	return enc.Encode(out)
+	return writeJSON(cmd.OutOrStdout(), out, !ineffectiveJSON)
 }
