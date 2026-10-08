@@ -1,27 +1,12 @@
 // Package validator validates JSON and JSONC documents against JSON Schema.
 //
-// It is consumed TWO ways, and both are first-class:
+// It is consumed Ways, and both are first-class:
 //
 //   - the json-validator CLI / GitHub Action in this repo, and
 //   - as a LIBRARY embedded in other Go programs -- webhook-runner validates
 //     every hook.json against its published schema at load through this
 //     package, so a manifest is checked by one implementation in CI and at
 //     runtime rather than by two that drift.
-//
-// What being embeddable requires, and what this package therefore guarantees:
-//
-//   - The ZERO VALUE of Options works. Defaults live here, not in the CLI's
-//     flag definitions, so `validator.Options{}` means draft 2020-12 with
-//     format assertions on.
-//   - Behavior is a pure function of Options. This package reads NO
-//     environment variables; the CLI resolves
-//     JSON_VALIDATION_ALLOW_SILENT_FAILURES into Options itself, because a
-//     library that changes behavior on ambient env is a trap for its host.
-//   - Schemas can come from memory, not just a path or URL (CompileBytes,
-//     NewFromBytes) -- an embedder usually has its schema compiled in.
-//   - Compile once, validate many (the Validator type): a server revalidating
-//     on every reload must not recompile a constant schema each time.
-//   - Nothing here writes to stdout/stderr or exits. Results are values.
 package validator
 
 import (
@@ -36,8 +21,7 @@ import (
 	"github.com/tidwall/jsonc"
 )
 
-// DefaultDraft is the draft assumed when a schema does not name one and
-// Options.Draft is empty.
+// DefaultDraft is the draft assumed when a schema does not name one and Options.Draft is empty.
 const DefaultDraft = "2020"
 
 type Result struct {
@@ -48,8 +32,7 @@ type Result struct {
 }
 
 // AsError renders the result as a single error: nil when valid, the load /
-// parse error when there was one, else the validation failure. Embedders
-// usually want an error, not a struct to re-inspect.
+// parse error when there was one, else the validation failure.
 func (r Result) AsError() error {
 	if r.Err != nil {
 		return r.Err
@@ -95,12 +78,9 @@ func (r Result) Detail() string {
 	return strings.Join(lines, "; ")
 }
 
-// Options configures validation. The zero value is valid: draft 2020-12,
-// format assertions ON (this package's deliberate deviation from the 2020-12
-// spec default -- a `format` in the schema is meant to be enforced).
+// Options configures validation.
 type Options struct {
-	// SchemaPath is a file path or http(s) URL. Empty means each document's
-	// own $schema decides.
+	// SchemaPath is a file path or http(s) URL. Empty means each document's own $schema decides.
 	SchemaPath string
 	// Draft is "4", "6", "7", "2019" or "2020"; empty means DefaultDraft.
 	Draft string
@@ -147,8 +127,7 @@ func Validate(r io.Reader, filename string, compiled *jsonschema.Schema, opts Op
 	return doValidate(r, filename, compiled, opts)
 }
 
-// stripJSONC removes comments and trailing commas -- every input this package
-// accepts is JSONC, on the CLI and in a host program alike.
+// stripJSONC removes comments and trailing commas -- every input this package accepts is JSONC.
 func stripJSONC(raw []byte) []byte { return jsonc.ToJSON(raw) }
 
 // parseJSONC parses one JSONC value: a comment is whitespace, and a comma
@@ -252,11 +231,6 @@ func parseDraft(s string) (*jsonschema.Draft, error) {
 // SilentFailureAllowed reports whether `feature` appears in the value of
 // JSON_VALIDATION_ALLOW_SILENT_FAILURES (comma, semicolon or space
 // delimited).
-//
-// It is a HELPER for the CLI, never consulted by validation itself: the
-// library's behavior must follow from Options alone, so the CLI calls this and
-// sets the corresponding Option. An embedder that wants the same env-driven
-// escape hatch can call it too -- explicitly.
 func SilentFailureAllowed(feature string) bool {
 	env := os.Getenv("JSON_VALIDATION_ALLOW_SILENT_FAILURES")
 	if env == "" {

@@ -1,6 +1,8 @@
 package validator
 
 import (
+	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -123,8 +125,10 @@ func TestTrailingCommasInASchemaTheDocumentNames(t *testing.T) {
 
 	v, err := New(Options{})
 	require.NoError(t, err)
-	doc := `{"$schema": "file://` + filepath.ToSlash(schemaPath) + `", "name": "ok",}`
-	res := v.ValidateBytes([]byte(doc), "doc.json")
+	ref, err := json.Marshal("file://" + filepath.ToSlash(schemaPath))
+	require.NoError(t, err)
+	doc := bytes.Replace([]byte(`{"$schema": REF, "name": "ok",}`), []byte("REF"), ref, 1)
+	res := v.ValidateBytes(doc, "doc.json")
 	require.NoError(t, res.Err)
 	assert.True(t, res.Valid, res.Detail())
 }

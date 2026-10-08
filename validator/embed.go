@@ -11,16 +11,9 @@ import (
 
 // The embedding surface: compile a schema once, validate many documents
 // against it, without touching the underlying jsonschema compiler.
-//
-// The CLI's shape (a schema path plus a list of files, one process, exit code)
-// is a poor fit for a server: its schema is usually compiled into the binary
-// rather than sitting at a path, it validates on every reload, and it wants an
-// error value instead of printed output. Everything below exists so a host
-// program does not have to reach around this package to get that.
 
 // Validator is a compiled schema plus the options it was compiled with, ready
-// to validate documents repeatedly. Safe for concurrent use: compilation
-// happens up front and validation does not mutate it.
+// to validate documents repeatedly.
 type Validator struct {
 	schema *jsonschema.Schema
 	opts   Options
@@ -30,7 +23,7 @@ type Validator struct {
 // http(s) URL).
 //
 // With an empty SchemaPath the Validator has no schema of its own and each
-// document's `$schema` decides -- the CLI's default mode, which costs a
+// document's `$schema` decides -- the CLI's default mode. This costs a
 // compile per document, so prefer a fixed schema when you have one.
 func New(opts Options) (*Validator, error) {
 	if opts.SchemaPath == "" {
@@ -47,13 +40,8 @@ func New(opts Options) (*Validator, error) {
 	return &Validator{schema: sch, opts: opts}, nil
 }
 
-// NewFromBytes compiles a schema held IN MEMORY -- the embedded case: a host
-// program that ships its schema with go:embed has no path to hand over, and
-// must not depend on a file or a network fetch at validation time.
-//
-// `name` identifies the schema in error messages and resolves any relative
-// $ref inside it; it is not fetched. Use something stable and recognizable
-// (e.g. "embedded:hook.schema.json").
+// NewFromBytes compiles a schema held IN MEMORY -- the embedded case. A host
+// program that ships its schema with go:embed has no path to hand over.
 func NewFromBytes(name string, schema []byte, opts Options) (*Validator, error) {
 	sch, err := CompileBytes(name, schema, opts)
 	if err != nil {
@@ -83,8 +71,7 @@ func CompileBytes(name string, schema []byte, opts Options) (*jsonschema.Schema,
 	return sch, nil
 }
 
-// Schema exposes the compiled schema, for a caller that needs the underlying
-// jsonschema API. Nil when the Validator resolves a schema per document.
+// Schema exposes the compiled schema, for a caller that needs the underlying jsonschema API.
 func (v *Validator) Schema() *jsonschema.Schema { return v.schema }
 
 // Validate checks one document read from r. `filename` is used only to label
@@ -94,7 +81,7 @@ func (v *Validator) Validate(r io.Reader, filename string) Result {
 }
 
 // ValidateBytes checks a document already in memory -- the common case for a
-// host program that just read a manifest.
+// host program that read a manifest.
 func (v *Validator) ValidateBytes(doc []byte, filename string) Result {
 	return doValidate(bytes.NewReader(doc), filename, v.schema, v.opts)
 }

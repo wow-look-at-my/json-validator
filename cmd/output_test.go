@@ -53,8 +53,7 @@ func TestWriteJSONModes(t *testing.T) {
 	assert.JSONEq(t, strict.String(), string(jsonc.ToJSON(withCommas.Bytes())))
 }
 
-// removeTrailingCommas drops each comma that ends a line before a closing
-// bracket, which turns the default output back into the strict output.
+// removeTrailingCommas turns the default output into the strict output.
 func removeTrailingCommas(s string) string {
 	return regexp.MustCompile(`,(\n *[}\]])`).ReplaceAllString(s, "$1")
 }
