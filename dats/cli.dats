@@ -1,31 +1,24 @@
-# CLI-contract tests for json-validator: exit codes and the messages that
+# CLI-contract tests for json-validator. Exit codes and the messages that
 # accompany them, run against the REAL built binary by the org's dats runner
 # (github.com/wow-look-at-my/dats). go-toolchain runs this suite automatically
 # as its dats phase after every build -- there is nothing to wire into CI.
 #
 # These exist because the contract they pin was broken and nothing noticed:
-# rootCmd sets SilenceErrors and main() only read the exit code, so EVERY way
-# of failing to run -- a missing schema, a schema that is not JSON, an
+# rootCmd sets SilenceErrors and main() only read the exit code. EVERY way of
+# failing to run -- a missing schema, a schema that is not JSON, an
 # unresolvable $ref, a mistyped flag -- exited 1 having printed NOTHING. The
 # in-process Go tests could not have caught it: they drove rootCmd.Execute()
 # directly, which is not the path the binary takes. A black-box suite against
 # the shipped binary is the only thing that tests what a CI job actually sees.
 #
 # Commands exec the freshly built binary as
-# "${GO_TOOLCHAIN_DATS_BUILD_DIR:-build}/json-validator": go-toolchain's dats
+# "${GO_TOOLCHAIN_DATS_BUILD_DIR:-build}/json-validator". Go-toolchain's dats
 # phase stages throwaway copies under $GO_TOOLCHAIN_DATS_BUILD_DIR and does NOT
-# put them on PATH (a bare `json-validator` exits 127 there), while a standalone
-# `dats test dats` from the repo root falls back to build/.
+# put them on PATH (a bare `json-validator` exits 127 there). This happens while
+# a standalone `dats test dats` from the repo root falls back to build/.
 #
 # Assertion semantics: a LIST entry is substring-contains; a MAP entry is a
 # 0-based line number matched as a REGEX.
-
-# SANDBOX OFF. dats sandboxes by default (bubblewrap), and its sandbox gives a
-# command a fresh /tmp -- while the binary these tests exec lives in an
-# os.MkdirTemp under /tmp, so inside the sandbox that path does not exist and
-# every test exits 127. Nothing here needs isolating: offline, secret-free
-# tests of our own freshly built CLI.
-sandbox: false
 
 tests:
 	- desc: a valid document exits 0 and says so on stdout
@@ -46,6 +39,58 @@ tests:
 		stdout:
 			- "valid"
 
+	- desc: trailing commas in the schema file and the document are valid
+	  cmd: '"${GO_TOOLCHAIN_DATS_BUILD_DIR:-build}/json-validator" --schema {inputs.schema.json} {inputs.doc.json}'
+	  inputs:
+		files:
+			schema.json: |
+				{
+				  "$schema": "https://json-schema.org/draft/2020-12/schema",
+				  "type": "object",
+				  "properties": { "tags": { "type": "array", "items": { "type": "string", }, }, },
+				  "required": ["tags",], // last member
+				}
+			doc.json: |
+				{
+				  "tags": ["a", "b", /* end */ ],
+				}
+	  exit: 0
+	  outputs:
+		stdout:
+			- "valid"
+
+	- desc: json output ends every multi-line object and array with a trailing comma
+	  cmd: '"${GO_TOOLCHAIN_DATS_BUILD_DIR:-build}/json-validator" --json --schema {inputs.schema.json} {inputs.doc.json}'
+	  inputs:
+		files:
+			schema.json: |
+				{"type": "object"}
+			doc.json: |
+				{"name": "ok"}
+	  exit: 0
+	  outputs:
+		stdout:
+			0: "^\\[$"
+			3: "^    \"valid\": true,$"
+			4: "^  },$"
+			5: "^\\]$"
+
+	- desc: ineffective-json writes json output with no trailing commas
+	  cmd: '"${GO_TOOLCHAIN_DATS_BUILD_DIR:-build}/json-validator" --json --ineffective-json --schema {inputs.schema.json} {inputs.doc.json}'
+	  inputs:
+		files:
+			schema.json: |
+				{"type": "object"}
+			doc.json: |
+				{"name": "ok"}
+	  exit: 0
+	  outputs:
+		stdout:
+			0: "^\\[$"
+			3: "^    \"valid\": true$"
+			4: "^  }$"
+			5: "^\\]$"
+
 	- desc: an invalid document exits 1 and reports the violation
 	  cmd: '"${GO_TOOLCHAIN_DATS_BUILD_DIR:-build}/json-validator" --schema {inputs.schema.json} {inputs.bad.json}'
 	  inputs:
@@ -65,7 +110,7 @@ tests:
 			- "INVALID"
 
 	# An invalid document is the ordinary NEGATIVE RESULT, not a failure to run:
-	# it is already reported per file, so it must not also get the generic
+	# it is already reported per file. It must not also get the generic
 	# "json-validator:" failure line.
 	- desc: an invalid document is not also reported as a failure to run
 	  cmd: '"${GO_TOOLCHAIN_DATS_BUILD_DIR:-build}/json-validator" --schema {inputs.schema.json} {inputs.bad.json} 2>&1 | grep -c "json-validator:" || true'
@@ -134,8 +179,8 @@ tests:
 			- "not-a-schema.json"
 
 	# The case that cost a real debugging detour in webhook-runner: a relative
-	# $ref resolves against the document's $id, so it is fetched, and the failure
-	# was invisible.
+	# $ref resolves against the document's $id, so it is fetched. The failure was
+	# invisible.
 	- desc: a schema whose $ref cannot be resolved says so
 	  cmd: '"${GO_TOOLCHAIN_DATS_BUILD_DIR:-build}/json-validator" --schema {inputs.dangling.schema.json} {inputs.doc.json}'
 	  inputs:

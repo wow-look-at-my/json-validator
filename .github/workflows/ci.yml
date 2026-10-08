@@ -2,6 +2,12 @@ name: CI
 
 on:
   push:
+    branches: ['**']
+  workflow_dispatch:
+
+concurrency:
+  group: gha_${{ github.repository }}_${{ github.workflow }}_${{ github.ref != 'refs/heads/master' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
 permissions:
   id-token: write
@@ -12,12 +18,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    # Job-level permissions REPLACE the workflow-level set, so this repeats the
-    # four this job already had and adds the two the buildhost publish needs:
-    # go-toolchain registers a GitHub Deployment for the publish and records
-    # each artifact on the org's linked-artifacts page. Both are part of
-    # publishing rather than something a repo can decline -- without them the
-    # publish step fails the build.
+    # Job permissions replace the workflow set; the publish needs deployments and artifact-metadata.
     permissions:
       id-token: write
       contents: write
@@ -27,10 +28,9 @@ jobs:
       artifact-metadata: write
     steps:
       - uses: actions/checkout@v4
-      - uses: wow-look-at-my/go-toolchain@v1
+      - uses: wow-look-at-my/go-toolchain@master
 
-  # Exercise the composite action end-to-end on a real runner: this runs the
-  # download-prebuilt path and validates known-good fixtures (exit 0).
+  # Runs the composite action's download path on known-good fixtures.
   action-selftest:
     runs-on: ubuntu-latest
     steps:

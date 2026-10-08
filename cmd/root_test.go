@@ -22,6 +22,7 @@ func runCmd(args ...string) (stdout, stderr string, err error) {
 	quietFlag = false
 	draftFlag = "2020"
 	noAssertFormat = false
+	ineffectiveJSON = false
 	rootCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
 
 	outBuf := &bytes.Buffer{}
@@ -31,8 +32,7 @@ func runCmd(args ...string) (stdout, stderr string, err error) {
 	rootCmd.SetErr(errBuf)
 	rootCmd.SetArgs(args)
 
-	// Execute(), not rootCmd.Execute(): the error reporting lives there, so
-	// going straight to cobra would test a path main() never takes.
+	// Execute(), not rootCmd.Execute().
 	err = Execute()
 
 	rootCmd.SetOut(nil)
@@ -153,7 +153,7 @@ func TestCLIJSONOutputInvalid(t *testing.T) {
 }
 
 // The documented env escape hatch (JSON_VALIDATION_ALLOW_SILENT_FAILURES)
-// lives at the CLI boundary: the library reads no environment, so the CLI is
+// lives at the CLI boundary: the library reads no environment. The CLI is
 // what turns the variable into the option it stands for. Asserted end to end,
 // because "the flag exists" is not the same claim.
 func TestCLIEnvDisablesFormatAssertions(t *testing.T) {

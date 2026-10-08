@@ -1,10 +1,11 @@
 package cmd
 
 import (
-	"encoding/json"
+	"cmp"
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/spf13/cobra"
@@ -12,16 +13,18 @@ import (
 )
 
 var (
-	schemaFlag     string
-	jsonOutputFlag bool
-	quietFlag      bool
-	draftFlag      string
-	noAssertFormat bool
+	schemaFlag      string
+	jsonOutputFlag  bool
+	quietFlag       bool
+	draftFlag       string
+	noAssertFormat  bool
+	ineffectiveJSON bool
 )
 
 func init() {
 	rootCmd.Flags().StringVarP(&schemaFlag, "schema", "s", "", "path or URL to JSON Schema (overrides $schema in document)")
-	rootCmd.Flags().BoolVar(&jsonOutputFlag, "json", false, "output errors as JSON")
+	rootCmd.Flags().BoolVar(&jsonOutputFlag, "json", false, "output errors as JSON, with a trailing comma after the last member of every multi-line object and array")
+	rootCmd.Flags().BoolVar(&ineffectiveJSON, "ineffective-json", false, "with --json, write strict JSON: no trailing commas")
 	rootCmd.Flags().BoolVarP(&quietFlag, "quiet", "q", false, "suppress output; exit code only")
 	rootCmd.Flags().StringVarP(&draftFlag, "draft", "d", "2020", "default draft version when schema has no $schema (4, 6, 7, 2019, 2020)")
 	rootCmd.Flags().BoolVar(&noAssertFormat, "no-assert-format", false, "disable format assertions (format becomes annotation-only per spec)")
@@ -38,7 +41,11 @@ By default, the schema is determined from the $schema field in each document.
 Use --schema to override with a local file path or URL.
 
 Supports JSON with Comments (JSONC): // line comments, /* block comments */,
-and trailing commas are stripped before validation.
+and trailing commas are accepted in every document and schema. Validation
+never rewrites an input file, so a trailing comma in it stays.
+
+--json output writes a trailing comma after the last member of every
+multi-line object and array. Add --ineffective-json for strict JSON.
 
 Format assertions (email, date-time, uri, etc.) are enforced by default.
 Use --no-assert-format to disable, or set the environment variable
@@ -48,26 +55,11 @@ JSON_VALIDATION_ALLOW_SILENT_FAILURES=assert-format`,
 	RunE:          run,
 }
 
-// errValidationFailed marks the ordinary negative result -- documents were
-// read and found invalid -- as distinct from a failure to run at all. Each one
-// has already been reported per file (or --quiet asked for silence), so
-// Execute prints nothing further for it; the exit code carries it.
+// errValidationFailed marks the ordinary negative result -- documents were read and found invalid.
 var errValidationFailed = errors.New("validation failed")
 
 // Execute runs the CLI and reports any failure that is NOT an ordinary invalid
 // document on stderr.
-//
-// This is load-bearing. rootCmd sets SilenceErrors, so cobra prints nothing
-// itself, and main() only reads the exit code -- which left every way of
-// failing to RUN silent: a schema that does not exist, one that is not valid
-// JSON, one whose $ref cannot be resolved, a mistyped flag. All of them exited
-// 1 having printed NOTHING, the worst failure mode for a gate CI depends on:
-// red with no reason, and nothing to search for.
-//
-// --quiet does not suppress this. It means "exit code only" about RESULTS, the
-// way `grep -q` still prints "No such file or directory" for a missing file:
-// suppressing the answer is not the same as hiding the fact that no answer
-// could be computed.
 func Execute() error {
 	err := rootCmd.Execute()
 	if err != nil && !errors.Is(err, errValidationFailed) {
@@ -84,9 +76,8 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// The library reads no environment: behavior must follow from Options
-	// alone for the programs that embed it. So the documented env escape
-	// hatch is resolved HERE and folded into the option it stands for.
+	// The library reads no environment: behavior must follow from Options alone
+	// for the programs that embed it.
 	opts := validator.Options{
 		SchemaPath:     schemaFlag,
 		Draft:          draftFlag,
@@ -180,10 +171,20 @@ func printJSON(cmd *cobra.Command, results []validator.Result) error {
 			out[i].Error = r.Err.Error()
 		}
 		if r.Error != nil {
-			out[i].Errors = r.Error.BasicOutput()
+			out[i].Errors = sortedBasicOutput(r.Error.BasicOutput())
 		}
 	}
-	enc := json.NewEncoder(cmd.OutOrStdout())
-	enc.SetIndent("", "  ")
-	return enc.Encode(out)
+	return writeJSON(cmd.OutOrStdout(), out, !ineffectiveJSON)
+}
+
+// sortedBasicOutput orders the errors by instance location, then keyword
+// location, so the same document always prints the same JSON.
+func sortedBasicOutput(u *jsonschema.OutputUnit) *jsonschema.OutputUnit {
+	slices.SortStableFunc(u.Errors, func(a, b jsonschema.OutputUnit) int {
+		if c := cmp.Compare(a.InstanceLocation, b.InstanceLocation); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.KeywordLocation, b.KeywordLocation)
+	})
+	return u
 }
