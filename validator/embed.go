@@ -9,8 +9,7 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
-// The embedding surface: compile a schema once, validate many documents
-// against it, without touching the underlying jsonschema compiler.
+// The embedding surface: compile a schema once, validate many documents.
 
 // Validator is a compiled schema plus the options it was compiled with, ready
 // to validate documents repeatedly.

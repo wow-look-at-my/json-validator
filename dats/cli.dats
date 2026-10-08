@@ -20,13 +20,6 @@
 # Assertion semantics: a LIST entry is substring-contains; a MAP entry is a
 # 0-based line number matched as a REGEX.
 
-# SANDBOX OFF. dats sandboxes by default (bubblewrap), and its sandbox gives a
-# command a fresh /tmp -- while the binary these tests exec lives in an
-# os.MkdirTemp under /tmp, so inside the sandbox that path does not exist and
-# every test exits 127. Nothing here needs isolating: offline, secret-free
-# tests of our own freshly built CLI.
-sandbox: false
-
 tests:
 	- desc: a valid document exits 0 and says so on stdout
 	  cmd: '"${GO_TOOLCHAIN_DATS_BUILD_DIR:-build}/json-validator" --schema {inputs.schema.json} {inputs.doc.json}'
